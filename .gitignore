@@ -1,6 +1,13 @@
 # Prerequisites
 *.d
 
+#/Linemod_preprocessed
+/datasets/Linemod_preprocessed
+*.pyc
+
+src/__pycache__
+#/datasets.*
+
 # Compiled Object files
 *.slo
 *.lo
