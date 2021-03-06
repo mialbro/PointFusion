@@ -30,18 +30,13 @@ class PointFusionDataset(Dataset):
     def __init__(self, mode='train', pnt_cnt=0, csv_file='', root_dir='', transform=None):
         #self.object_list = [1, 2, 4, 5, 6, 9, 9, 10, 11, 12, 13, 14, 15]
         self.object_list = [2]
-
         self.model_pcd = {}
-
         self.image_paths = []
         self.mask_paths = []
         self.depth_paths = []
-
         self.ground_truth = {}
         self.ground_truth_ids = []
-
         self.object_ids = []
-
         self.root_dir = root_dir
         self.transform = transform
 
@@ -55,7 +50,6 @@ class PointFusionDataset(Dataset):
                     break
                 if input_line[-1:] == '\n':
                     input_line = input_line[:-1]
-
                 self.image_paths.append('{}/data/{}/rgb/{}.png'.format(self.root_dir, '%02d' % item, input_line))
                 self.depth_paths.append('{}/data/{}/depth/{}.png'.format(self.root_dir, '%02d' % item, input_line))
                 self.mask_paths.append('{}/data/{}/mask/{}.png'.format(self.root_dir, '%02d' % item, input_line))
@@ -69,18 +63,14 @@ class PointFusionDataset(Dataset):
             ground_truth_file = open('{}/data/{}/gt.yml'.format(self.root_dir, '%02d' % item), 'r')
             self.ground_truth[item] = yaml.load(ground_truth_file, Loader=yaml.FullLoader)
             self.model_pcd[item] = utils.openModel('{0}/models/obj_{1}.ply'.format(self.root_dir, '%02d' % item))
-
             print('Object {} buffer loaded'.format(item))
 
         self.length = len(self.image_paths)
-
         self.camera_intrinsics = {'fx': 572.41140, 'fy': 573.57043, 'cx': 325.26110, 'cy': 242.04899}
 
         self.pnt_cnt = pnt_cnt
         self.norm = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         self.border_list = [-1, 40, 80, 120, 160, 200, 240, 280, 320, 360, 400, 440, 480, 520, 560, 600, 640, 680]
-        self.num_pt_mesh_large = 500
-        self.num_pt_mesh_small = 500
         self.symmetry_obj_idx = [7, 8]
 
     def __len__(self):
