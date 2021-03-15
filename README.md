@@ -1,3 +1,7 @@
 # pytorch_pointfusion
- Implementationn of PointFusion Paper (6D pose estimation) from research paper
-https://arxiv.org/abs/1711.10871
+ - Unnoficial implementation of PointFusion Neural Network: https://arxiv.org/abs/1711.10871
+ - Regresses spatial offsets from object points and its 3D bounding box
+ 
+ ### Datasets:
+ - [x] Linemod:
+ - [ ] Objectron:
