@@ -31,7 +31,6 @@ class STN3d(nn.Module):
         #x = F.relu(self.bn1(self.conv1(x)))
         #x = F.relu(self.bn2(self.conv2(x)))
         #x = F.relu(self.bn3(self.conv3(x)))
-
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = F.relu(self.conv3(x))
@@ -80,7 +79,6 @@ class STNkd(nn.Module):
         #x = F.relu(self.bn1(self.conv1(x)))
         #x = F.relu(self.bn2(self.conv2(x)))
         #x = F.relu(self.bn3(self.conv3(x)))
-
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = F.relu(self.conv3(x))
@@ -90,7 +88,6 @@ class STNkd(nn.Module):
 
         #x = F.relu(self.bn4(self.fc1(x)))
         #x = F.relu(self.bn5(self.fc2(x)))
-
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
 
@@ -106,7 +103,7 @@ class STNkd(nn.Module):
 
 
 class PointNetEncoder(nn.Module):
-    def __init__(self, global_feat=True, feature_transform=True, channel=3):
+    def __init__(self, feature_transform=True, channel=3):
         super(PointNetEncoder, self).__init__()
         self.stn = STN3d(channel)
         self.conv1 = torch.nn.Conv1d(channel, 64, 1)
@@ -115,7 +112,6 @@ class PointNetEncoder(nn.Module):
         self.bn1 = nn.BatchNorm1d(64)
         self.bn2 = nn.BatchNorm1d(128)
         self.bn3 = nn.BatchNorm1d(1024)
-        self.global_feat = global_feat
         self.feature_transform = feature_transform
         if self.feature_transform:
             self.fstn = STNkd(k=64)
@@ -130,11 +126,10 @@ class PointNetEncoder(nn.Module):
         if D > 3:
             x = torch.cat([x,feature],dim=2)
         x = x.transpose(2, 1)
-        
+
         #x = F.relu(self.bn1(self.conv1(x)))
-
+        pnt_feats = x
         x = F.relu(self.conv1(x))
-
         if self.feature_transform:
             trans_feat = self.fstn(x)
             x = x.transpose(2, 1)
@@ -144,20 +139,17 @@ class PointNetEncoder(nn.Module):
             trans_feat = None
 
         pointfeat = x
-        
+        pointfeat = pointfeat.permute(0, 2, 1)
+
         #x = F.relu(self.bn2(self.conv2(x)))
         #x = self.bn3(self.conv3(x))
-
         x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
-       
+        x = self.conv3(x)
+
         x = torch.max(x, 2, keepdim=True)[0]
-        x = x.view(-1, 1024)
-        if self.global_feat:
-            return x, trans, trans_feat
-        else:
-            x = x.view(-1, 1024, 1).repeat(1, 1, N)
-            return torch.cat([x, pointfeat], 1), trans, trans_feat
+        x = x.view(B, -1, 1024)
+        globalfeat = x
+        return pointfeat, globalfeat
 
 
 def feature_transform_reguliarzer(trans):
@@ -170,20 +162,7 @@ def feature_transform_reguliarzer(trans):
 
 '''
 model = PointNetEncoder()
-data = np.zeros((3,1))
+data = np.zeros((3,12))
 torch_data = torch.tensor([data], dtype=torch.float)
-
-pcl_encoding = model(torch_data)
-
-np_res = []
-i = 0
-while True:
-    try:
-        res = pcl_encoding[i].detach()
-        print(res.size())
-        #np_res.push_back(res)
-    except:
-        print('done')
-        break
-    i += 1
+pointfeat, globalfeat = model(torch_data)
 '''

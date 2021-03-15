@@ -5,6 +5,51 @@ import torch.nn as nn
 import torchvision
 import numpy.ma as ma
 
+# (corner_offsets, model_points)
+def sampleCloud(offsets, cloud, pnt_cnt):
+    cnt = cloud.shape[0]
+    if (pnt_cnt > cnt):
+        return np.zeros((1, 3)), np.zeros((1, 3))
+    idx = np.random.choice(cnt, pnt_cnt, replace=False)
+    sampled_offsets = offsets[idx, :]
+    sampled_cloud = cloud[idx, :]
+    return sampled_offsets, sampled_cloud
+
+def getPose(gt):
+    trans = np.reshape(np.array(gt['cam_t_m2c']), (3, 1))
+    rot = np.resize(np.array(gt['cam_R_m2c']), (3, 3))
+    T = np.vstack((np.hstack((rot, trans)), np.array([0, 0, 0, 1])))
+    return T
+
+def projectPoints(K, T, pnts_3d):
+    zeros = np.zeros((pnts_3d.shape[0], 1))
+    pnts_3d = np.hstack((pnts_3d, zeros))
+    pnts_2d = K @ T @ pnts_3d.T
+    pnts_2d = pnts_2d / pnts_2d[2]
+    pnts_2d = pnts_2d[0:2, :].T.astype(int)
+    return pnts_2d
+
+def normalizeCloud(v):
+    v_min = v.min(axis=(0, 1), keepdims=True)
+    v_max = v.max(axis=(0, 1), keepdims=True)
+    norm_cloud = (v - v_min)/(v_max - v_min)
+    return norm_cloud
+
+def normalize2Cloud(cloud1, cloud2):
+    cloud1_min = cloud1.min(axis=(0, 1), keepdims=True)
+    cloud1_max = cloud1.max(axis=(0, 1), keepdims=True)
+
+    cloud2_min = cloud2.min(axis=(0, 1), keepdims=True)
+    cloud2_max = cloud2.max(axis=(0, 1), keepdims=True)
+
+    min = np.minimum(cloud1_min, cloud2_min)
+    max = np.maximum(cloud1_max, cloud2_max)
+
+    cloud1_norm = (cloud1 - min)/(max - min)
+    cloud2_norm = (cloud2 - min)/(max - min)
+
+    return cloud1_norm, cloud2_norm
+
 def computeMinDistance(pnts1, pnts2):
     pnts1 = pnts1.reshape((-1, 1, 3))                 # [200x1x3]
     pnts2 = np.expand_dims(pnts2, axis=0)             # [1x100x3]
@@ -25,11 +70,11 @@ def getObjId(object_id, ground_truth):
                 model_index = i
     return model_index
 
-def depthToCloud(depth, K):
+def depthToCloud(depth, mask, K):
     rows, cols = depth.shape
     cnt = rows * cols
     c, r = np.meshgrid(np.arange(cols), np.arange(rows), sparse=True)
-    valid = (depth > 0) #& (depth < 255)
+    valid = (depth > 0) & (mask != False)
     z = np.where(valid, depth, np.nan)
     x = np.where(valid, z * (c - K['cx']) / K['fx'], 0)
     y = np.where(valid, z * (r - K['cy']) / K['fy'], 0)
@@ -38,6 +83,7 @@ def depthToCloud(depth, K):
     y = y.flatten()
     z = z.flatten()
     points = np.dstack((x, y, z))[0]
+    points = points[~np.isnan(points).any(axis=1)]
     return points
 
 def getBoundingBox(img):
@@ -92,6 +138,13 @@ def viewCloud(cloud):
     pcd = open3d.geometry.PointCloud()
     pcd.points = open3d.utility.Vector3dVector(cloud)
     open3d.visualization.draw_geometries([pcd])
+
+def view2Cloud(cloud1, cloud2):
+    pcd1 = open3d.geometry.PointCloud()
+    pcd2 = open3d.geometry.PointCloud()
+    pcd1.points = open3d.utility.Vector3dVector(cloud1)
+    pcd2.points = open3d.utility.Vector3dVector(cloud2)
+    open3d.visualization.draw_geometries([pcd1, pcd2])
 
 def draw3dCorners(cloud, corners):
     pcd = open3d.geometry.PointCloud()
