@@ -2,6 +2,11 @@
  - Unofficial implementation of PointFusion Neural Network: https://arxiv.org/abs/1711.10871
  - Regresses spatial offsets from object points and its 3D bounding box
  
- ### Datasets:
- - [x] Linemod:
- - [ ] Objectron:
+### in progress
+### To-do:
+- [x] Linemod dataset script
+- [ ] Objectron dataset script
+- [x] Custom PoinNet Network
+- [x] PointFusion Network
+- [x] ResNet50 Feature Extraction Network
+- [ ] Unsupervised Loss Function
