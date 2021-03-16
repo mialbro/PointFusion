@@ -9,4 +9,5 @@
 - [x] Custom PoinNet Network
 - [x] PointFusion Network
 - [x] ResNet50 Feature Extraction Network
-- [ ] Unsupervised Loss Function
+- [x] Unsupervised Loss Function
+- [ ] Train
