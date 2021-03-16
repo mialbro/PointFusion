@@ -51,16 +51,3 @@ class PointFusion(nn.Module):
         scores = self.softmax(scores)
         scores = scores.view(B, D)
         return corner_offsets, scores
-
-'''
-cloud = [np.random.rand(3, 12), np.random.rand(3, 12)]
-cloud = torch.Tensor(cloud)
-
-img = [np.random.rand(24, 24, 3), np.random.rand(24, 24, 3)]
-img = torch.Tensor(img).permute(0, 3, 1, 2)
-#img = torch.from_numpy(img.astype(np.float32)).unsqueeze(0)
-
-model = PointFusion()
-model.train()
-model(img, cloud)
-'''

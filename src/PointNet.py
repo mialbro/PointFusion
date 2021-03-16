@@ -159,10 +159,3 @@ def feature_transform_reguliarzer(trans):
         I = I.cuda()
     loss = torch.mean(torch.norm(torch.bmm(trans, trans.transpose(2, 1) - I), dim=(1, 2)))
     return loss
-
-'''
-model = PointNetEncoder()
-data = np.zeros((3,12))
-torch_data = torch.tensor([data], dtype=torch.float)
-pointfeat, globalfeat = model(torch_data)
-'''

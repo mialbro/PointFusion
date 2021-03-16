@@ -113,17 +113,3 @@ class PointFusionDataset(Dataset):
 
     def __len__(self):
         return self.length
-'''
-if __name__ == '__main__':
-    device = torch.device('cpu')
-    preprocessing = transforms.Compose([
-        transforms.RandomSizedCrop(224),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-    pfd = PointFusionDataset(root_dir='../datasets/Linemod_preprocessed', mode='train', transform=preprocessing)
-    while True:
-        index = random.randint(0, pfd.length)
-        pfd.__getitem__(index)
-'''
