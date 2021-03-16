@@ -49,6 +49,7 @@ class PointFusion(nn.Module):
         # obtain pdf ranking each offset to 3d bounding box
         scores = self.fc5(x)
         scores = self.softmax(scores)
+        scores = scores.view(B, D)
         return corner_offsets, scores
 
 '''

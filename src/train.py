@@ -33,7 +33,6 @@ def train(model, train_loader, n_epochs, optimizer, loss_fn):
         model.train()
         for batch, (img, cloud, offsets) in enumerate(train_loader):
             cloud = cloud.permute(0, 2, 1)
-            offsets = offsets.permute(0, 3, 1, 2)
             img = img.to(device=device)
             cloud = cloud.to(device=device)
             offsets = offsets.to(device=device)
@@ -48,13 +47,13 @@ def train(model, train_loader, n_epochs, optimizer, loss_fn):
             train_loss += loss.item()
             losses.append(loss.item())
             if epoch % 500 == 0:
-                print('Epoch %d, Loss %f' % (epoch, float(loss)))
+                print('Epoch: {}, Loss: {}'.format(epoch, loss))
     return model
 
 def main():
     split = 2
-    n_epochs = 10
-    batch_size = 1
+    n_epochs = 1000
+    batch_size = 4
     pnt_cnt = 200
     root_dir = '../datasets/Linemod_preprocessed'
     model = PointFusion()
