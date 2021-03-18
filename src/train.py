@@ -61,6 +61,7 @@ def main():
     loss_fn = Loss.unsupervisedLoss
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
     model = train(model, train_loader, n_epochs, optimizer, loss_fn)
+    torch.save(model.state_dict(), 'pointfusion.pth')
 
 if __name__ == '__main__':
     main()
