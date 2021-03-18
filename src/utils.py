@@ -5,6 +5,26 @@ import torch.nn as nn
 import torchvision
 import numpy.ma as ma
 
+# get the corner offsets with the highest scores
+def getPredictedCorner(offsets, scores):
+    B, N, D = offsets.shape
+    ~, indices = torch.max(scores, 1)
+    corners = np.zeros((B, 8, 3)
+    for i in range(0, B):
+        for j in range(0, 8):
+            corners[i][j] = (cloud[i, indices[i]] - offsets[i, indices[i], j]).numpy()
+    return corners
+
+def getCornersFromOffset(offsets, cloud):
+    B, N, D = cloud.shape
+    corners = np.zeros((B, 8, 3))
+    for i in range(0, 8):
+        corners[B, i, :] = cloud[:, i] - offsets[:, :]
+    for i in range(0, cnt):
+        for j in range(0, 8):
+            corners[i][j] = cloud[i] - corner_offsets[i][j]
+    return corners
+
 # (corner_offsets, model_points)
 def sampleCloud(offsets, cloud, pnt_cnt):
     cnt = cloud.shape[0]
