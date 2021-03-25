@@ -31,7 +31,7 @@ def train(model, train_loader, n_epochs, optimizer, loss_fn):
         losses = []
         train_loss = 0.0
         model.train()
-        for batch, (img, cloud, offsets) in enumerate(train_loader):
+        for batch_cnt, (img, cloud, offsets) in enumerate(train_loader):
             cloud = cloud.permute(0, 2, 1)
             img = img.to(device=device)
             cloud = cloud.to(device=device)
@@ -46,9 +46,26 @@ def train(model, train_loader, n_epochs, optimizer, loss_fn):
             optimizer.step()
             train_loss += loss.item()
             losses.append(loss.item())
-            if epoch % 500 == 0:
+            if batch_cnt % 500 == 0:
                 print('Epoch: {}, Loss: {}'.format(epoch, loss))
     return model
+
+def validate(model, val_loader, n_epochs, loss_fn):
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for batch_cnt, (img, cloud, offsets) in enumerate(train_loader):
+            batch_size = img.shape[0]
+            # get data from loader
+            cloud = cloud.permute(0, 2, 1)
+            img = img.to(device=device)
+            cloud = cloud.to(device=device)
+            offsets = offsets.to(device=device)
+            # forward pass: predict outputs
+            pred_offsets, pred_scores = model(img, cloud)
+            corners = utils.getPredictedCorner(pred_offsets, pred_scores)
+            loss = loss_fn(corners, utils.getCornerOffsets(offsets, clouds))
+    print("Accuracy: %f", correct / total)
 
 def main():
     split = 2
@@ -58,10 +75,11 @@ def main():
     root_dir = '../datasets/Linemod_preprocessed'
     model = PointFusion()
     train_loader, test_loader = getDatatLoaders(root_dir, batch_size, 'train', split, pnt_cnt)
-    loss_fn = Loss.unsupervisedLoss
+    train_loss_fn = Loss.unsupervisedLoss
+    val_loss_fn = Loss.cornerLoss
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
-    model = train(model, train_loader, n_epochs, optimizer, loss_fn)
-    torch.save(model.state_dict(), 'pointfusion.pth')
+    model = train(model, train_loader, n_epochs, optimizer, train_loss_fn)
+    torch.save(model.state_dict(), 'models/pointfusion.pth')
 
 if __name__ == '__main__':
     main()

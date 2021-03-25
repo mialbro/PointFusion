@@ -8,14 +8,14 @@ import numpy.ma as ma
 # get the corner offsets with the highest scores
 def getPredictedCorner(offsets, scores):
     B, N, D = offsets.shape
-    ~, indices = torch.max(scores, 1)
-    corners = np.zeros((B, 8, 3)
+    _, indices = torch.max(scores, 1)
+    corners = np.zeros((B, 8, 3))
     for i in range(0, B):
         for j in range(0, 8):
             corners[i][j] = (cloud[i, indices[i]] - offsets[i, indices[i], j]).numpy()
     return corners
 
-def getCornersFromOffset(offsets, cloud):
+def getCornersFromOffsets(offsets, cloud):
     B, N, D = cloud.shape
     corners = np.zeros((B, 8, 3))
     for i in range(0, 8):
