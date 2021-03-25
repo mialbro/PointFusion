@@ -14,7 +14,8 @@ import cv2
 import utils
 import open3d
 from PIL import Image
-from torchvision import transforms
+from torchvision import transforms, models
+from PointFusion import PointFusion
 
 preprocess = transforms.Compose([
     transforms.Resize(256),
@@ -23,8 +24,10 @@ preprocess = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
-model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)
-model.eval()
+pointfusion = PointFusion()
+maskrcnn = models.detection.maskrcnn_resnet50_fpn(pretrained=True)
+pointfusion.eval()
+maskrcnn.eval()
 
 def instance_segmentation(image, model):
     input_image = transform(input_image)
@@ -77,12 +80,9 @@ clipping_distance = clipping_distance_in_meters / depth_scale
 align_to = rs.stream.color
 align = rs.align(align_to)
 
-vis = open3d.visualization.Visualizer()
-vis.create_window()
-
+# camera intrinsics
 camera_props = (rs.video_stream_profile(profile.get_stream(rs.stream.depth)).get_intrinsics())
 K = {'fx': camera_props.fx, 'fy': camera_props.fy, 'cx': camera_props.ppx, 'cy': camera_props.ppy}
-
 
 # Streaming loop
 try:
@@ -102,24 +102,29 @@ try:
         if not aligned_depth_frame or not color_frame:
             continue
 
-
+        # get instance segmentation 
         depth_image = np.asanyarray(aligned_depth_frame.get_data())
         color_image = np.asanyarray(color_frame.get_data())
-        masks, bb = instance_segmentation(color_image, depth)
+        masks, bbs = instance_segmentation(color_image, maskrcnn)
+
+        # applly masks and collect segmented image patches and pointclouds
         for mask, bb in zip(masks, bbs):
             mask = np.full(depth_image.shape, True, dtype=bool)
             # apply mask
             cloud = utils.depthToCloud(depth_image * depth_scale, mask, K)
             clouds.append(cloud)
             images.append(masked_image)
+
+        # convert numpy arrays to tensors
         image_tensor = torch.Tensor(img).permute(0, 3, 1, 2)
         cloud_tensor = torch.Tensor(cloud)
-        offsets, scores = model(image_tensor, cloud_tensor)
-        input_image = Image.open(filename)
 
-        
+        # pass data through network and regress corners
+        offsets, scores = pointfusion(image_tensor, cloud_tensor)
+        corners3d = utils.getPredictedCorner(offsets, scores)
+        corners2d = utils.projectPoints(corners3d, K)
+        color_image = utils.draw2dCorners(color_image, corners2d)
 
-        depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
         images = np.hstack((color_image, depth_colormap))
         cv2.namedWindow('Align Example', cv2.WINDOW_NORMAL)
         cv2.imshow('Align Example', images)
@@ -130,25 +135,3 @@ try:
             break
 finally:
     pipeline.stop()
-
-'''
-    vis = open3d.visualization.Visualizer()
-    vis.create_window()
-    vis.add_geometry(source
-    threshold = 0.05
-    icp_iteration = 100
-    save_image = False
-
-    for i in range(icp_iteration):
-        reg_p2l = open3d.registration.registration_icp(
-            source, target, threshold, np.identity(4),
-            open3d.registration.TransformationEstimationPointToPlane(),
-            open3d.registration.ICPConvergenceCriteria(max_iteration=1))
-        source.transform(reg_p2l.transformation)
-        vis.update_geometry()
-        vis.poll_events()
-        vis.update_renderer()
-        if save_image:
-            vis.capture_screen_image("temp_%04d.jpg" % i)
-    vis.destroy_window()
-'''

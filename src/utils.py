@@ -5,6 +5,22 @@ import torch.nn as nn
 import torchvision
 import numpy.ma as ma
 
+def projectPoints(pnts3d, K):
+    K = np.array([[K["fx"],  0.0,    K["cx"]],
+                    [0.0,    K["fy"], -K["cy"]],
+                    [0.0,     0.0,      1.0]])
+    pnts2d = K @ pnts3d
+    pnts2d = pnts2d / pnts2d[2, :]
+    pnts2d = pnts2d[:2, :]
+    return pnts2d
+
+def draw2dCorners(color_image, corners):
+    for i in range(0, corners.shape[1]):
+        corner = corners[:2, i]
+        cv2.circle(color_image, corner)
+    return color_image
+
+
 # get the corner offsets with the highest scores
 def getPredictedCorner(offsets, scores):
     B, N, D = offsets.shape
@@ -41,6 +57,7 @@ def getPose(gt):
     T = np.vstack((np.hstack((rot, trans)), np.array([0, 0, 0, 1])))
     return T
 
+'''
 def projectPoints(K, T, pnts_3d):
     zeros = np.zeros((pnts_3d.shape[0], 1))
     pnts_3d = np.hstack((pnts_3d, zeros))
@@ -48,6 +65,7 @@ def projectPoints(K, T, pnts_3d):
     pnts_2d = pnts_2d / pnts_2d[2]
     pnts_2d = pnts_2d[0:2, :].T.astype(int)
     return pnts_2d
+'''
 
 def normalizeCloud(v):
     v_min = v.min(axis=(0, 1), keepdims=True)
@@ -67,8 +85,6 @@ def normalize2Cloud(cloud1, cloud2):
 
     cloud1_norm = (cloud1 - min)/(max - min)
     cloud2_norm = (cloud2 - min)/(max - min)
-
-    return cloud1_norm, cloud2_norm
 
 def computeMinDistance(pnts1, pnts2):
     pnts1 = pnts1.reshape((-1, 1, 3))                 # [200x1x3]
@@ -93,11 +109,11 @@ def getObjId(object_id, ground_truth):
 def depthToCloud(depth, mask, K):
     rows, cols = depth.shape
     cnt = rows * cols
-    c, r = np.meshgrid(np.arange(cols), np.arange(rows), sparse=True)
+    c, r = np.meshgrid(np.arange(cols), np.arange(rows), sparse=False)
     valid = (depth > 0) & (mask != False)
     z = np.where(valid, depth, np.nan)
-    x = np.where(valid, z * (c - K['cx']) / K['fx'], 0)
-    y = np.where(valid, z * (r - K['cy']) / K['fy'], 0)
+    x = np.where(valid, z * (c - (K['cx'] / K['fx'])), 0)
+    y = np.where(valid, z * (r - (K['cy'] / K['fy'])), 0)
 
     x = x.flatten()
     y = y.flatten()
