@@ -4,7 +4,7 @@
  
 ### in progress
 ### To-do:
-- [x] Linemod dataset script
+- [x] Linemod dataset (https://drive.google.com/file/d/18C_MKYG3a01bgBGo15-Syj1kAlix3rGO/view?usp=sharing)
 - [ ] Objectron dataset script
 - [x] Custom PoinNet Network
 - [x] PointFusion Network
