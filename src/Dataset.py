@@ -18,8 +18,8 @@ import random
 
 class PointFusionDataset(Dataset):
     def __init__(self, root_dir='', mode='train', pnt_cnt=100, transform=None):
-        #self.object_list = [1, 2, 4, 5, 6, 9, 9, 10, 11, 12, 13, 14, 15]
-        self.object_list = [4]
+        self.object_list = [1, 2, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15]
+        #self.object_list = [4]
         self.model_pcd = {}
         self.image_paths = []
         self.mask_paths = []
@@ -27,11 +27,16 @@ class PointFusionDataset(Dataset):
         self.ground_truth = {}
         self.ground_truth_ids = []
         self.object_ids = []
-
         self.root_dir = root_dir
         self.transform = transform
         self.pnt_cnt = pnt_cnt
         self.mode = mode
+        self.transform = transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
 
         item_cnt = 0
         for item in self.object_list:
@@ -86,29 +91,19 @@ class PointFusionDataset(Dataset):
         segmented_img = Image.fromarray(segmented_img)
         depth_mask = np.zeros(depth.shape)
         depth_mask[rmin:rmax, cmin:cmax] = True
-        # project depth map
-        cloud = utils.depthToCloud(depth, depth_mask, self.camera_intrinsics)
         # get the ground_truth pose
         mTc = utils.getPose(model_ground_truth)
         # apply transformation to the model pointcloud
         model_points = utils.transformCloud(model_points, (mTc))
-        # get the model corners
-        model_corners = utils.getCorners(model_points)
-        corner_offsets = utils.getCornerOffsets(model_corners, model_points)
-        if self.mode == 'train':
-            corner_offsets, model_points = utils.sampleCloud(corner_offsets, model_points, self.pnt_cnt)
-        if model_points.shape[0] <= 1:
-            return torch.Tensor(), torch.Tensor(), torch.Tensor()
-        #utils.draw3dCorners(cloud, utils.getCornersFromOffsets(corner_offsets, model_points)[0])
-        return (self.transform((segmented_img)), \
-                torch.from_numpy(model_points.astype(np.float32)), \
-                torch.from_numpy(corner_offsets.astype(np.float32)))
-
-        if self.mode == 'train':
-            cloud = utils.sampleCloud(cloud, self.pnt_cnt)
-        if cloud.shape[1] <= 1:
-            return torch.Tensor(), torch.Tensor(), torch.Tensor()
-        cloud = cloud.T
+        # get the model corners (ground truth)
+        cloud = utils.depthToCloud(depth, depth_mask, self.camera_intrinsics)
+        corners = utils.getCorners(model_points)
+        corner_offsets = utils.getCornerOffsets(corners, cloud)
+        # sample points
+        corner_offsets, cloud = utils.sampleCloud(corner_offsets, cloud, self.pnt_cnt)
+        #utils.draw3dCorners(cloud, utils.getCornersFromOffsets(corner_offsets, cloud)[0])
+        #utils.draw3dCorners(cloud, corners)
+        return (self.transform((segmented_img)),torch.from_numpy(cloud.astype(np.float32)),torch.from_numpy(corner_offsets.astype(np.float32)))
 
     def __len__(self):
         return self.length

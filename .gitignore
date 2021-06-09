@@ -1,3 +1,5 @@
+*.tar.xz
+.pth
 # Prerequisites
 *.d
 

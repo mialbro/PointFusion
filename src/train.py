@@ -7,26 +7,19 @@ import Loss
 from torchvision import transforms, datasets
 from PointFusion import PointFusion
 
-preprocessing = transforms.Compose([
-    transforms.RandomResizedCrop(224),
-    transforms.RandomHorizontalFlip(),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-])
-
-def getDatatLoaders(root_dir, batch_size, mode, split, pnt_cnt):
-    dataset = PointFusionDataset(root_dir=root_dir, mode=mode, pnt_cnt=pnt_cnt, transform=preprocessing)
-    test_cnt = int(dataset.length / split)
-    train_cnt = int(dataset.length - test_cnt)
-    train_set, test_set = torch.utils.data.random_split(dataset, [train_cnt, test_cnt])
-    train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
-    test_loader = torch.utils.data.DataLoader(dataset=test_set, batch_size=batch_size, shuffle=False)
-    return train_loader, test_loader
-
+def saveCheckpoint(model, epoch, optimizer, loss, path):
+    torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': loss
+                }, path)
 
 def train(model, train_loader, n_epochs, optimizer, loss_fn):
+    model.train()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
+    cnt = 0
     for epoch in range(n_epochs):
         losses = []
         train_loss = 0.0
@@ -47,14 +40,18 @@ def train(model, train_loader, n_epochs, optimizer, loss_fn):
             train_loss += loss.item()
             losses.append(loss.item())
             if batch_cnt % 500 == 0:
+                cnt += 1
+                saveCheckpoint(model, epoch, optimizer, loss, 'models/pointfusion_{}.pth'.format(cnt))
                 print('Epoch: {}, Loss: {}'.format(epoch, loss))
     return model
 
-def validate(model, val_loader, n_epochs, loss_fn):
-    correct = 0
-    total = 0
+def validate(model, val_loader, loss_fn):
+    cnt = 0
+    running_loss = 0.0
+    model.eval()
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     with torch.no_grad():
-        for batch_cnt, (img, cloud, offsets) in enumerate(train_loader):
+        for batch_cnt, (img, cloud, offsets) in enumerate(val_loader):
             batch_size = img.shape[0]
             # get data from loader
             cloud = cloud.permute(0, 2, 1)
@@ -63,23 +60,32 @@ def validate(model, val_loader, n_epochs, loss_fn):
             offsets = offsets.to(device=device)
             # forward pass: predict outputs
             pred_offsets, pred_scores = model(img, cloud)
-            corners = utils.getPredictedCorner(pred_offsets, pred_scores)
-            loss = loss_fn(corners, utils.getCornerOffsets(offsets, clouds))
-    print("Accuracy: %f", correct / total)
+            loss = loss_fn(pred_offsets, pred_scores, offsets)
+            running_loss += loss
+            cnt += 1
+    print('Accuracy: {}'.format(running_loss / cnt))
+
+def loadData(root_dir, batch_size, pnt_cnt):
+    train_dataset = PointFusionDataset(root_dir=root_dir, mode='train', pnt_cnt=pnt_cnt)
+    dataset_size = train_dataset.length
+    train_size = int(0.8 * dataset_size)
+    test_size = dataset_size - train_size
+    train_dataset, test_dataset = torch.utils.data.random_split(train_dataset, [train_size, test_size])
+    train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
+    return train_loader, test_loader
 
 def main():
-    split = 2
-    n_epochs = 1000
-    batch_size = 4
-    pnt_cnt = 200
-    root_dir = '../datasets/Linemod_preprocessed'
     model = PointFusion()
-    train_loader, test_loader = getDatatLoaders(root_dir, batch_size, 'train', split, pnt_cnt)
+    batch_size = 1
+    train_loader, test_loader = loadData(root_dir='datasets/Linemod_preprocessed', batch_size=batch_size, pnt_cnt=400)
     train_loss_fn = Loss.unsupervisedLoss
-    val_loss_fn = Loss.cornerLoss
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+    test_loss_fn = Loss.cornerLoss
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+    n_epochs = 100
     model = train(model, train_loader, n_epochs, optimizer, train_loss_fn)
-    torch.save(model.state_dict(), 'models/pointfusion.pth')
+    validate(model, test_loader, n_epochs, test_loss_fn)
+    torch.save(model, 'models/pointfusion.pth')
 
 if __name__ == '__main__':
     main()

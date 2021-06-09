@@ -30,7 +30,7 @@ def getPredictedCorner(offsets, scores):
         for j in range(0, 8):
             corners[i][j] = (cloud[i, indices[i]] - offsets[i, indices[i], j]).numpy()
     return corners
-
+'''
 def getCornersFromOffsets(offsets, cloud):
     B, N, D = cloud.shape
     corners = np.zeros((B, 8, 3))
@@ -38,9 +38,9 @@ def getCornersFromOffsets(offsets, cloud):
         corners[B, i, :] = cloud[:, i] - offsets[:, :]
     for i in range(0, cnt):
         for j in range(0, 8):
-            corners[i][j] = cloud[i] - corner_offsets[i][j]
+            corners[i][j] = cloud[i] - offsets[i][j]
     return corners
-
+'''
 # (corner_offsets, model_points)
 def sampleCloud(offsets, cloud, pnt_cnt):
     cnt = cloud.shape[0]
@@ -109,11 +109,11 @@ def getObjId(object_id, ground_truth):
 def depthToCloud(depth, mask, K):
     rows, cols = depth.shape
     cnt = rows * cols
-    c, r = np.meshgrid(np.arange(cols), np.arange(rows), sparse=False)
+    u, v = np.meshgrid(np.arange(cols), np.arange(rows), sparse=False)
     valid = (depth > 0) & (mask != False)
     z = np.where(valid, depth, np.nan)
-    x = np.where(valid, z * (c - (K['cx'] / K['fx'])), 0)
-    y = np.where(valid, z * (r - (K['cy'] / K['fy'])), 0)
+    x = np.where(valid, (z * (u - K['cx'])) / K['fx'], 0)
+    y = np.where(valid, (z * (v - K['cy'])) / K['fy'], 0)
 
     x = x.flatten()
     y = y.flatten()
