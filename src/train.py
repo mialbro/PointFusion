@@ -17,7 +17,6 @@ def splitTrainTest(train_set, split):
     total_size = train_set.length
     train_size = int(split * total_size)
     test_size = total_size - train_size
-    print(train_size)
     return [train_size, test_size]
 
 # predata processing
@@ -30,6 +29,7 @@ transform = transforms.Compose([
 
 # hyperparameters
 learning_rate = 1e-3
+weight_decay = 1e-5
 batch_size = 10
 num_epochs = 5
 
@@ -44,7 +44,7 @@ model = PointFusion().to(device)
 
 # loss and optimizer
 criterion = Loss.unsupervisedLoss
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
 cnt = 0
 total_loss = []
@@ -67,10 +67,8 @@ for epoch in range(num_epochs):
         # statistics
         running_loss += loss.item()
         total_loss.append(running_loss)
-        print(loss.item())
         if batch_idx % int(len(train_loader) / 4) == 0:    # print every len(dataset)/4 mini-batches
-            print('[%d, %5d] loss: %.3f' %
-                  (epoch + 1, batch_idx + 1, running_loss / 2000))
+            print('[%d, %5d] loss: %.3f' % (epoch + 1, batch_idx + 1, running_loss / 2000))
             saveCheckpoint(model, epoch, optimizer, loss, 'models/pointfusion_{}.pth'.format(batch_idx))
             cnt += 1
 
