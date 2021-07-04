@@ -19,7 +19,6 @@ import random
 class PointFusionDataset(Dataset):
     def __init__(self, root_dir='', mode='train', pnt_cnt=100, transform=None):
         self.object_list = [1, 2, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15]
-        #self.object_list = [4]
         self.model_pcd = {}
         self.image_paths = []
         self.mask_paths = []
@@ -31,12 +30,6 @@ class PointFusionDataset(Dataset):
         self.transform = transform
         self.pnt_cnt = pnt_cnt
         self.mode = mode
-        self.transform = transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
 
         item_cnt = 0
         for item in self.object_list:

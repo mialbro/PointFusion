@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torchvision
 import numpy.ma as ma
+import cv2
 
 def projectPoints(pnts3d, K):
     K = np.array([[K["fx"],  0.0,    K["cx"]],

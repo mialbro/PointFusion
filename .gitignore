@@ -2,10 +2,13 @@
 .pth
 # Prerequisites
 *.d
+*.png
 
 #/Linemod_preprocessed
-/datasets/Linemod_preprocessed
+
+*.pth
 *.pyc
+/src/datasets
 
 src/__pycache__
 #/datasets.*
