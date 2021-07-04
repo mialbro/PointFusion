@@ -10,4 +10,4 @@
 - [x] PointFusion Network
 - [x] ResNet50 Feature Extraction Network
 - [x] Unsupervised Loss Function
-- [ ] Train
+- [x] Train
