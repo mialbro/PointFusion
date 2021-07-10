@@ -4,7 +4,7 @@ import torch.nn as nn
 import torchvision
 
 def unsupervisedLoss(pred_offsets, pred_scores, offsets):
-    eps = 1e-7
+    eps = 1e-16
     weight = 0.1
     L1 = nn.SmoothL1Loss(reduction='none')
     loss_offset = L1(pred_offsets, offsets) # [B x pnts x 8 x 3]

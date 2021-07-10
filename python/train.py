@@ -4,6 +4,8 @@ from Dataset import PointFusionDataset
 from torchvision import transforms
 from PointFusion import PointFusion
 import Loss
+import numpy as np
+import matplotlib.pyplot as plt
 
 def saveCheckpoint(model, epoch, optimizer, loss, path):
     torch.save({
@@ -31,7 +33,7 @@ transform = transforms.Compose([
 learning_rate = 1e-3
 weight_decay = 1e-5
 batch_size = 10
-num_epochs = 5
+num_epochs = 20
 
 # load data
 dataset = PointFusionDataset(root_dir='datasets/Linemod_preprocessed', mode='train', pnt_cnt=400, transform=transform)
@@ -47,7 +49,7 @@ criterion = Loss.unsupervisedLoss
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
 cnt = 0
-total_loss = []
+loss_values = []
 for epoch in range(num_epochs):
     running_loss = 0.0
     for batch_idx, (img, cloud, target) in enumerate(train_loader):
@@ -66,11 +68,15 @@ for epoch in range(num_epochs):
 
         # statistics
         running_loss += loss.item()
-        total_loss.append(running_loss)
-        if batch_idx % int(len(train_loader) / 4) == 0:    # print every len(dataset)/4 mini-batches
-            print('[%d, %5d] loss: %.3f' % (epoch + 1, batch_idx + 1, running_loss / 2000))
+        loss_values.append(running_loss / batch_size)
+        if (batch_idx + 1) % batch_size == 0:
+            print('[%d, %5d] loss: %.3f' % (epoch + 1, batch_idx + 1, running_loss / batch_size))
             saveCheckpoint(model, epoch, optimizer, loss, 'models/pointfusion_{}.pth'.format(batch_idx))
-            cnt += 1
+            running_loss = 0
 
         # gradient descent
         optimizer.step()
+
+print('Finished Training')
+plt.plot(np.array(loss_values), 'r')
+plt.show()

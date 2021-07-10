@@ -54,15 +54,11 @@ class PointFusionDataset(Dataset):
             self.ground_truth[item] = yaml.load(ground_truth_file, Loader=yaml.FullLoader)
             self.model_pcd[item] = utils.openModel('{0}/models/obj_{1}.ply'.format(self.root_dir, '%02d' % item))
             print('Object {} buffer loaded'.format(item))
-
         fx = 572.41140
         fy = 573.57043
         cx = 325.26110
         cy = 242.04899
         self.camera_intrinsics = {'fx': fx, 'fy': fy, 'cx': cx, 'cy': cy}
-        self.K = np.array([[fx, 0, cx, 0],
-                            [0, fy, cy, 0],
-                            [0, 0, 1, 0]])
         self.length = len(self.image_paths)
 
     def __getitem__(self, index):

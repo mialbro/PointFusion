@@ -1,3 +1,4 @@
+python/datasets
 *.tar.xz
 .pth
 # Prerequisites

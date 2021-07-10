@@ -36,7 +36,7 @@ class PointFusion(nn.Module):
         global_feats = global_feats.repeat(1, D, 1)
         # concatenate features along columns
         dense_feats = torch.cat([img_feats, point_feats, global_feats], 2)
-        dense_feats = self.fusion_dropout(dense_feats)
+        #dense_feats = self.fusion_dropout(dense_feats)
         # pass features through mlp
         x = self.fc1(dense_feats) # (n x 3136)
         x = self.relu(x)
