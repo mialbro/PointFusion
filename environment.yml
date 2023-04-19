@@ -1,0 +1,14 @@
+name: pointfusion
+channels:
+  - defaults
+  - pytorch
+dependencies:
+  - numpy
+  - pytorch
+  - open3d
+  - vista
+  - pillow
+  - opencv
+  - torchvision
+  - torchsummary
+  - matplotlib

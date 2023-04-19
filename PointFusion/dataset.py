@@ -1,7 +1,6 @@
 import os
 import torch
 from torch.utils.data import Dataset
-#from skimage import io
 import utils
 import numpy as np
 import open3d
@@ -16,7 +15,14 @@ from scipy.spatial import distance
 import cv2
 import random
 
-class PointFusionDataset(Dataset):
+class OCCLUSION(Dataset):
+    def __init__(self):
+        pass
+
+    def __getitem__(self, index):
+        return super().__getitem__(index)
+
+class LINEMOD(Dataset):
     def __init__(self, root_dir='', mode='train', pnt_cnt=100, transform=None):
         self.object_list = [1, 2, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15]
         self.model_pcd = {}
