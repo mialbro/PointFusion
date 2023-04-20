@@ -15,3 +15,24 @@
 - [x] ResNet50 Feature Extraction Network
 - [x] Unsupervised Loss Function
 - [x] Train
+
+```
+import pointfusion
+
+pf = pointfusion.PointFusion()
+
+pf.dataset = LINEMOD('/home/linemod/LINEMOD')
+pf.mode = pointfusion.Mode.TRAIN
+
+pf.train()
+```
+
+
+```
+import pointfusion
+
+pf = pointfusion.PointFusion()
+
+for (frame, cloud) in zip(frames, clouds):
+  
+```

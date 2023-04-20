@@ -5,10 +5,11 @@ channels:
 dependencies:
   - numpy
   - pytorch
-  - open3d
-  - vista
   - pillow
   - opencv
   - torchvision
-  - torchsummary
   - matplotlib
+  - pip:
+    - torchsummary
+    - scipy
+    - open3d
