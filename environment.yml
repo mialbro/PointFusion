@@ -13,3 +13,4 @@ dependencies:
     - torchsummary
     - scipy
     - open3d
+    - distinctipy

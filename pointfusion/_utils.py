@@ -200,11 +200,11 @@ def draw3dCorners(cloud, corners):
         [4, 6],
         [4, 7],
     ]
-    colors = [[1, 0, 0] for i in range(len(lines))]
     line_set = open3d.geometry.LineSet(
         points=open3d.utility.Vector3dVector(corners),
         lines=open3d.utility.Vector2iVector(lines),
     )
+    colors = [[1, 0, 0] for i in range(len(lines))]
     line_set.colors = open3d.utility.Vector3dVector(colors)
     open3d.visualization.draw_geometries([pcd, line_set])
 

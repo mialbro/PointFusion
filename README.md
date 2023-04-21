@@ -36,3 +36,8 @@ pf = pointfusion.PointFusion()
 for (frame, cloud) in zip(frames, clouds):
   
 ```
+
+conda deactivate
+conda remove -n pointfusion --all
+
+conda env create -f environment.yml

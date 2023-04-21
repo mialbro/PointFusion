@@ -1,4 +1,5 @@
 import numpy as np
+import open3d as o3d
 from scipy.spatial.transform import Rotation as R
 
 # camera = Camera(camera_matrix=self.intrinsics[index], rvec=self.rvecs[index], tvec=self.tvecs[index])
@@ -19,6 +20,7 @@ class Camera:
     def frame_id(self):
         return self._frame_id
     
+    @property
     def parent_id(self):
         return self._parent_id
 
@@ -27,8 +29,20 @@ class Camera:
         return self._camera_matrix
     
     @property
-    def extrinsics(self):
+    def pose(self):
         return self._extrinsics
+    
+    @property
+    def rmat(self):
+        return self._rotation.as_matrix()
+    
+    @property
+    def rvec(self):
+        return self._rotation.as_rotvec()
+    
+    @property
+    def tvec(self):
+        return self._translation
     
     @property
     def projection_matrix(self):
@@ -53,11 +67,13 @@ class Camera:
     def project(self, points):
         return np.matmul(self.projection_matrix, points)
     
+    def transform(self, points):
+        return (np.matmul(self.rmat, points.T) + self.tvec).T
+    
     def backProject(self, uv, z): # [n x 2], [n x 1]
         # ([n x 2] - self.cx) / self.fx
         x = (uv - self.cx) / self.fx
         y = (uv - self.cy) / self.fy
-
     
     def backProject(self, depth, mask): # [r x c], 
         # [r x c], [r x c] -> 
@@ -74,11 +90,18 @@ class Camera:
         points = points[~np.isnan(points).any(axis=1)]
 
     def depth_to_cloud(self, depth):
-        u, v = np.meshgrid(np.arange(depth.shape[1]), np.arange(depth.shape[0]), sparse=False)
         valid = (depth > 0)
-        x = ((depth * (u - self.cx)) / self.fx)
-        y = ((depth * (v - self.cy)) / self.fy)
-        z = depth
-        #points = np.dstack((x, y, z))[0]
-        #points = points[~np.isnan(points).any(axis=1)]
-        import pdb; pdb.set_trace()
+        u, v = np.meshgrid(np.arange(depth.shape[1]), np.arange(depth.shape[0]), sparse=False)
+        x = ((depth * (u - self.cx)) / self.fx)[valid == True].flatten()
+        y = ((depth * (v - self.cy)) / self.fy)[valid == True].flatten()
+        z = depth[valid == True].flatten()
+        points = np.stack((x,y,z), axis=-1)
+        return points
+    
+    def inverse(self):
+        rotation = np.transpose(self.rmat)
+        translation = -np.matmul(rotation, self.tvec)
+
+        rotation = rotation.flatten().tolist()
+        translation = translation.flatten().tolist()
+        return Camera(camera_matrix=self.intrinsics, rotation=rotation, translation=translation)
