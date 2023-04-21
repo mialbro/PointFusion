@@ -1,2 +1,3 @@
 # ignore datasets folder
 datasets/*
+__pycache__/*
