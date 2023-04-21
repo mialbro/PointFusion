@@ -8,6 +8,8 @@ import open3d as o3d
 from PIL import Image
 from torch.utils.data import Dataset
 
+from torchvision import transforms
+
 import utils
 from camera import Camera
 
@@ -21,6 +23,15 @@ class LINEMOD(Dataset):
         self.intrinsics = []
         self.models = []
         self.ids = []
+
+        self.image_transform = transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+
+        self.cloud_transform = None
 
         for i, path in enumerate(sorted(glob.glob(os.path.join(root_dir, 'data', '*')))):
             depths = sorted(glob.glob(os.path.join(path, 'depth', '*.png')))
@@ -61,10 +72,19 @@ class LINEMOD(Dataset):
         rmin, rmax, cmin, cmax = utils.bbox_from_mask(mask)
         cropped_image = image[rmin:rmax, cmin:cmax]
 
-        return id, torch.from_numpy(cropped_image), torch.from_numpy(corners), torch.from_numpy(corner_offsets), torch.from_numpy(depth_cloud)
+        return id, torch.from_numpy(cropped_image), torch.from_numpy(depth_cloud), torch.from_numpy(corners), torch.from_numpy(corner_offsets)
 
     def __len__(self):
-        return self.length
-
-dataset = LINEMOD()
-dataset[0]
+        return len(self.ids)
+    
+    #@classmethod
+    #def split(cls, train_ratio=0.8):
+    #    dataset = cls()
+    #    return dataset.random_split(train_ratio)
+    
+    def split(self, ratio=0.8):
+        import pdb; pdb.set_trace()
+        n = len(self)
+        train_size = int(ratio * n)
+        test_size = int(n - train_size)
+        return torch.utils.data.random_split(self, [train_size, test_size])

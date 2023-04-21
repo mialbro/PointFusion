@@ -5,15 +5,9 @@ import torch.utils.data
 from torch.autograd import Variable
 import numpy as np
 import torch.nn.functional as F
-from torchsummary import summary
 from torchvision import models
 
-import numpy as np
 import torch
-import torch.nn as nn
-
-import torch
-import torch.nn as nn
 from torchvision import models
 
 def reguralize_features(features):
@@ -39,7 +33,6 @@ class ResNetFeatures(nn.Module):
         x = x.squeeze()
         x = x.view(batch, 1, 2048)
         return x
-    
 
 class PointNetEncoder(nn.Module):
     def __init__(self, feature_transform=True, channel=3):
@@ -167,9 +160,9 @@ class STNkd(nn.Module):
         x = x.view(-1, self.k, self.k)
         return x
 
-class PointFusion(nn.Module):
+class PointFusionNet(nn.Module):
     def __init__(self, pnt_cnt=100):
-        super(PointFusion, self).__init__()
+        super(PointFusionNet, self).__init__()
         self.image_embedding = ResNetFeatures()
         self.cloud_embedding = PointNetEncoder(feature_transform=True, channel=3)
 
@@ -186,17 +179,17 @@ class PointFusion(nn.Module):
         self.relu = torch.nn.ReLU()
         self.softmax = nn.Softmax(dim=0)
 
-    def forward(self, img, cloud):
+    def forward(self, image, cloud):
         B, N, D = cloud.shape
         # extract rgb (1 x 2048) features from image patch
-        img_feats = self.image_embedding(img)
+        image_feats = self.image_embedding(image)
         # extract point-wise (n x 64) and global (1 x 1024) features from pointcloud
         point_feats, global_feats = self.cloud_embedding(cloud)
         # duplicate first row for each point in the pointcloud
-        img_feats = img_feats.repeat(1, D, 1)
+        image_feats = image_feats.repeat(1, D, 1)
         global_feats = global_feats.repeat(1, D, 1)
         # concatenate features along columns
-        dense_feats = torch.cat([img_feats, point_feats, global_feats], 2)
+        dense_feats = torch.cat([image_feats, point_feats, global_feats], 2)
         #dense_feats = self.fusion_dropout(dense_feats)
         # pass features through mlp
         x = self.fc1(dense_feats) # (n x 3136)

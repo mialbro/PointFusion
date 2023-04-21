@@ -15,7 +15,6 @@ pf.mode = pointfusion.Mode.TRAIN
 pf.train()
 ```
 
-
 ```
 import pointfusion
 

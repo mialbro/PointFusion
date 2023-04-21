@@ -24,6 +24,7 @@ def get_corners(points):
     return corners
 
 def draw(points):
+    """draw a pointcloud or a list of pointclouds"""
     clouds = []
     colors = distinctipy.get_colors(len(points))
     for i in range(0, len(points)):
@@ -37,6 +38,7 @@ def draw(points):
     o3d.visualization.draw_geometries(clouds)
 
 def draw_(geometries):
+    """draw a list of geometries"""
     vis = o3d.visualization.Visualizer()
     vis.create_window()
     for geometry in geometries:
@@ -45,35 +47,13 @@ def draw_(geometries):
     vis.destroy_window()
 
 def to_pcd(points):
+    """convert ndarray to open3d pointcloud"""
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points)
     return pcd
 
-def to_obb(corners):
-    # compute the center of the box
-    center = np.mean(corners, axis=0)
-
-    # compute the lengths of the edges of the box
-    deltas = corners - center
-    length = np.max(np.abs(deltas[:, 0]))
-    width = np.max(np.abs(deltas[:, 1]))
-    height = np.max(np.abs(deltas[:, 2]))
-
-    # compute the orientation of the box
-    cov = deltas.T @ deltas
-    eigenvalues, eigenvectors = np.linalg.eig(cov)
-    max_eigenvalue_idx = np.argmax(eigenvalues)
-    orientation = eigenvectors[:, max_eigenvalue_idx]
-
-
-    if orientation.shape == (3,):
-        # orientation is a 1D array, reshape it to a 3x3 matrix
-        orientation = np.diag([1, 1, 1])
-        orientation[:, max_eigenvalue_idx] = eigenvectors[:, max_eigenvalue_idx]
-
-    obb = o3d.geometry.OrientedBoundingBox(center=center, lengths=[length, width, height], R=orientation.reshape(3, 3))
-
 def to_lines(corners):
+    """convert corners to lines"""
     lines = [
         [0, 1],
         [0, 2],

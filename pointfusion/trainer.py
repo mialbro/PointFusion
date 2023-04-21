@@ -1,86 +1,96 @@
 import torch
-import torch.nn as nn
-from pointfusion.dataset import PointFusionDataset
-from torchvision import transforms
-from pointfusion import PointFusion
-import Loss
 import numpy as np
-import matplotlib.pyplot as plt
+from torchvision import transforms
+
+import models
+from enums import Mode
+from datasets import LINEMOD
+from loss import unsupervised_loss, corner_loss
 
 class Trainer:
     def __init__(self) -> None:
-        pass
+        # hyperparameters
+        self.lr = 1e-3
+        self.weight_decay = 1e-5
+        self.batch_size = 10
+        self.epochs = 20
+
+        self._dataset = None
+        self._test_set = None
+        self._train_set = None
+        self._device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     def save_checkpoint(self, model, epoch, optimizer, loss, path):
-        torch.save({
-                    'epoch': epoch,
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'loss': loss
-                    }, path)
+        torch.save({'epoch': epoch, 'model': model.state_dict(), 'optimizer': optimizer.state_dict(), 'loss': loss}, path)
 
-    def split_train_test(self, train_set, split):
-        total_size = train_set.length
-        train_size = int(split * total_size)
-        test_size = total_size - train_size
-        return [train_size, test_size]
+    @property
+    def model(self):
+        return self._model
+    
+    @model.setter
+    def model(self, model):
+        self._model = model.to(self._device)
 
-    # predata processing
-    transform = transforms.Compose([
-        transforms.RandomResizedCrop(224),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
+    @property
+    def dataset(self):
+        return self._dataset
+    
+    @dataset.setter
+    def dataset(self, dataset):
+        self._dataset = dataset
+        self._test_set = dataset.split(0.8)
+        self._train_set = dataset.split(0.2)
 
-    # hyperparameters
-    learning_rate = 1e-3
-    weight_decay = 1e-5
-    batch_size = 10
-    num_epochs = 20
+    def fit(self):
+        # loss and optimizer
+        criterion = unsupervised_loss
+        optimizer = torch.optim.Adam(self._model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
-    # load data
-    dataset = PointFusionDataset(root_dir='datasets/Linemod_preprocessed', mode='train', pnt_cnt=400, transform=transform)
-    train_set, test_set = torch.utils.data.random_split(dataset, splitTrainTest(dataset, 0.8))
-    train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=batch_size, shuffle=True)
-    test_loader = torch.utils.data.DataLoader(dataset=test_set, batch_size=batch_size, shuffle=True)
+        for epoch in range(self.epochs):
+            # Training
+            self.model.train()
+            for batch_idx, (id, cropped_image, points, corners, corner_offsets) in enumerate(self._train_set):
+                optimizer.zero_grad()
+                # output from database
+                cropped_image = cropped_image.to(self._device)
+                corners = corners.to(self._device)
+                corner_offsets = corner_offsets.to(self._device)
+                points = points.to(self._device)
+                # forward
+                predicted_corners, predicted_probabilities = self._model(cropped_image, points)
+                loss = criterion(predicted_corners, predicted_probabilities, corner_offsets)
+                # backward
+                loss.backward()
+                # gradient descent
+                optimizer.step()
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = PointFusion().to(device)
+                '''
+                # statistics
+                running_loss += loss.item()
+                loss_values.append(running_loss / self.batch_size)
+                if (batch_idx + 1) % self.batch_size == 0:
+                    print('[%d, %5d] loss: %.3f' % (epoch + 1, batch_idx + 1, running_loss / self.batch_size))
+                    self.save_checkpoint(self._model, epoch, optimizer, loss, 'models/pointfusion_{}.pth'.format(batch_idx))
+                    running_loss = 0
+                '''
+            # Validation
+            self.model.eval()
+            with torch.no_grad():
+                total_loss = 0.0
+                total_correct = 0
+                for inputs, targets in self._test_set:
+                    outputs = self.model(inputs)  # forward pass
+                    loss = criterion(outputs, targets)  # calculate the loss
+                    total_loss += loss.item() * inputs.size(0)  # accumulate loss
+                    _, predicted = outputs.max(1)
+                    total_correct += predicted.eq(targets).sum().item()  # accumulate correct predictions
 
-    # loss and optimizer
-    criterion = Loss.unsupervisedLoss
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+                # Calculate validation metrics
+                val_loss = total_loss / len(self._test_set)
+                val_acc = total_correct / len(self._test_set)
 
-    cnt = 0
-    loss_values = []
-    for epoch in range(num_epochs):
-        running_loss = 0.0
-        for batch_idx, (img, cloud, target) in enumerate(train_loader):
-            cloud = cloud.permute(0, 2, 1)
-            img = img.to(device)
-            cloud = cloud.to(device)
-            target = target.to(device)
-            
-            # forward
-            pred_offset, pred_prob = model(img, cloud)
-            loss = criterion(pred_offset, pred_prob, target)
-            
-            # backward
-            optimizer.zero_grad()
-            loss.backward()
+trainer = Trainer()
+trainer.model = models.PointFusionNet()
+trainer.dataset = LINEMOD('datasets/Linemod_preprocessed')
 
-            # statistics
-            running_loss += loss.item()
-            loss_values.append(running_loss / batch_size)
-            if (batch_idx + 1) % batch_size == 0:
-                print('[%d, %5d] loss: %.3f' % (epoch + 1, batch_idx + 1, running_loss / batch_size))
-                saveCheckpoint(model, epoch, optimizer, loss, 'models/pointfusion_{}.pth'.format(batch_idx))
-                running_loss = 0
-
-            # gradient descent
-            optimizer.step()
-
-    print('Finished Training')
-    plt.plot(np.array(loss_values), 'r')
-    plt.show()
+trainer.fit()
