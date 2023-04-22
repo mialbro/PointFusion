@@ -72,10 +72,15 @@ class Trainer:
             with torch.no_grad():
                 total_loss = 0.0
                 total_correct = 0
-                for inputs, targets in self._val_loader:
-                    outputs = self.model(inputs)  # forward pass
+                for (id, cropped_image, cloud, corners, corner_offsets) in self._val_loader:
+                    image = cropped_image.to(self._device)
+                    corners = corners.to(self._device)
+                    targets = corner_offsets.to(self._device)
+                    cloud = cloud.to(self._device)
+
+                    outputs = self.model(image, cloud)  # forward pass
                     loss = criterion(outputs, targets)  # calculate the loss
-                    total_loss += loss.item() * inputs.size(0)  # accumulate loss
+                    total_loss += loss.item() * image.size(0)  # accumulate loss
                     _, predicted = outputs.max(1)
                     total_correct += predicted.eq(targets).sum().item()  # accumulate correct predictions
 

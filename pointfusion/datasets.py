@@ -14,7 +14,7 @@ import utils
 from camera import Camera
 
 class LINEMOD(Dataset):
-    def __init__(self, root_dir='../datasets/Linemod_preprocessed', corner_offset_sample=50, point_sample=1000):
+    def __init__(self, root_dir='../datasets/Linemod_preprocessed', point_sample=1000):
         self.depths = []
         self.masks = []
         self.images = []
@@ -24,13 +24,11 @@ class LINEMOD(Dataset):
         self.models = []
         self.ids = []
         self.point_sample = point_sample
-        self.corner_offset_sample = corner_offset_sample
 
         self.image_transform = transforms.Compose([
             transforms.RandomResizedCrop(224, scale=(0.5, 1.0)),
-            #transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
-            #transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
 
         self.cloud_transform = None
@@ -81,7 +79,7 @@ class LINEMOD(Dataset):
         # crop image
         rmin, rmax, cmin, cmax = utils.bbox_from_mask(mask)
         cropped_image = Image.fromarray(image[rmin:rmax, cmin:cmax])
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
 
         return id, self.image_transform(cropped_image), torch.from_numpy(depth_cloud).to(torch.float), torch.from_numpy(corners), torch.from_numpy(corner_offsets)
 
