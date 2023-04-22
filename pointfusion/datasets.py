@@ -14,7 +14,7 @@ import utils
 from camera import Camera
 
 class LINEMOD(Dataset):
-    def __init__(self, root_dir='../datasets/Linemod_preprocessed'):
+    def __init__(self, root_dir='../datasets/Linemod_preprocessed', corner_offset_sample=50, point_sample=1000):
         self.depths = []
         self.masks = []
         self.images = []
@@ -23,12 +23,14 @@ class LINEMOD(Dataset):
         self.intrinsics = []
         self.models = []
         self.ids = []
+        self.point_sample = point_sample
+        self.corner_offset_sample = corner_offset_sample
 
         self.image_transform = transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
+            transforms.RandomResizedCrop(224, scale=(0.5, 1.0)),
+            #transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            #transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
 
         self.cloud_transform = None
@@ -53,6 +55,7 @@ class LINEMOD(Dataset):
                 gt = yaml.load(f, Loader=yaml.FullLoader)
                 self.rvecs += [ gt[k][0]['cam_R_m2c'] for k in sorted(gt.keys()) ][:n]
                 self.tvecs += [ gt[k][0]['cam_t_m2c'] for k in sorted(gt.keys()) ][:n]
+            break
 
     def __getitem__(self, index):
         id = self.ids[index]
@@ -68,23 +71,24 @@ class LINEMOD(Dataset):
         
         depth_cloud = camera.depth_to_cloud(depth)
         corners = utils.get_corners(model)
-        corner_offsets = utils.get_corner_offsets(model, corners)
-        rmin, rmax, cmin, cmax = utils.bbox_from_mask(mask)
-        cropped_image = image[rmin:rmax, cmin:cmax]
+        # per-point corner offsets
+        corner_offsets = utils.get_corner_offsets(depth_cloud, corners)
 
-        return id, torch.from_numpy(cropped_image), torch.from_numpy(depth_cloud), torch.from_numpy(corners), torch.from_numpy(corner_offsets)
+        sample = np.random.choice(depth_cloud.shape[0], self.point_sample, replace=True)
+        corner_offsets = corner_offsets[sample]
+        # sample depth point cloud
+        depth_cloud = np.transpose(depth_cloud[sample])
+        # crop image
+        rmin, rmax, cmin, cmax = utils.bbox_from_mask(mask)
+        cropped_image = Image.fromarray(image[rmin:rmax, cmin:cmax])
+        import pdb; pdb.set_trace()
+
+        return id, self.image_transform(cropped_image), torch.from_numpy(depth_cloud).to(torch.float), torch.from_numpy(corners), torch.from_numpy(corner_offsets)
 
     def __len__(self):
         return len(self.ids)
     
-    #@classmethod
-    #def split(cls, train_ratio=0.8):
-    #    dataset = cls()
-    #    return dataset.random_split(train_ratio)
-    
     def split(self, ratio=0.8):
-        import pdb; pdb.set_trace()
-        n = len(self)
-        train_size = int(ratio * n)
-        test_size = int(n - train_size)
+        train_size = int(ratio * len(self))
+        test_size = int(len(self) - train_size)
         return torch.utils.data.random_split(self, [train_size, test_size])

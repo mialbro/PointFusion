@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-from torchvision import transforms
 
 import models
 from enums import Mode
@@ -12,12 +11,13 @@ class Trainer:
         # hyperparameters
         self.lr = 1e-3
         self.weight_decay = 1e-5
-        self.batch_size = 10
+        self.batch_size = 3
         self.epochs = 20
-
         self._dataset = None
         self._test_set = None
         self._train_set = None
+        self._train_loader = None
+        self._val_loader = None
         self._device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     def save_checkpoint(self, model, epoch, optimizer, loss, path):
@@ -38,8 +38,9 @@ class Trainer:
     @dataset.setter
     def dataset(self, dataset):
         self._dataset = dataset
-        self._test_set = dataset.split(0.8)
-        self._train_set = dataset.split(0.2)
+        self._train_set, self._test_set = dataset.split(0.8)
+        self._train_loader = torch.utils.data.DataLoader(dataset=self._train_set, batch_size=self.batch_size, shuffle=True)
+        self._val_loader = torch.utils.data.DataLoader(dataset=self._test_set, batch_size=self.batch_size, shuffle=True)
 
     def fit(self):
         # loss and optimizer
@@ -49,36 +50,29 @@ class Trainer:
         for epoch in range(self.epochs):
             # Training
             self.model.train()
-            for batch_idx, (id, cropped_image, points, corners, corner_offsets) in enumerate(self._train_set):
+            running_loss = 0.0
+            for batch_idx, (id, cropped_image, cloud, corners, corner_offsets) in enumerate(self._train_loader):
                 optimizer.zero_grad()
                 # output from database
                 cropped_image = cropped_image.to(self._device)
                 corners = corners.to(self._device)
                 corner_offsets = corner_offsets.to(self._device)
-                points = points.to(self._device)
+                cloud = cloud.to(self._device)
                 # forward
-                predicted_corners, predicted_probabilities = self._model(cropped_image, points)
-                loss = criterion(predicted_corners, predicted_probabilities, corner_offsets)
+                predicted_corner_offsets, predicted_scores = self._model(cropped_image, cloud)
+                loss = criterion(predicted_corner_offsets, predicted_scores, corner_offsets)
                 # backward
                 loss.backward()
                 # gradient descent
                 optimizer.step()
-
-                '''
-                # statistics
                 running_loss += loss.item()
-                loss_values.append(running_loss / self.batch_size)
-                if (batch_idx + 1) % self.batch_size == 0:
-                    print('[%d, %5d] loss: %.3f' % (epoch + 1, batch_idx + 1, running_loss / self.batch_size))
-                    self.save_checkpoint(self._model, epoch, optimizer, loss, 'models/pointfusion_{}.pth'.format(batch_idx))
-                    running_loss = 0
-                '''
+
             # Validation
             self.model.eval()
             with torch.no_grad():
                 total_loss = 0.0
                 total_correct = 0
-                for inputs, targets in self._test_set:
+                for inputs, targets in self._val_loader:
                     outputs = self.model(inputs)  # forward pass
                     loss = criterion(outputs, targets)  # calculate the loss
                     total_loss += loss.item() * inputs.size(0)  # accumulate loss
@@ -91,6 +85,5 @@ class Trainer:
 
 trainer = Trainer()
 trainer.model = models.PointFusionNet()
-trainer.dataset = LINEMOD('datasets/Linemod_preprocessed')
-
+trainer.dataset = LINEMOD()
 trainer.fit()

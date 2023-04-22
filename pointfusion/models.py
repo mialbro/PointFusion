@@ -7,9 +7,6 @@ import numpy as np
 import torch.nn.functional as F
 from torchvision import models
 
-import torch
-from torchvision import models
-
 def reguralize_features(features):
     d = features.size()[1]
     I = torch.eye(d)[None, :, :]
@@ -21,7 +18,7 @@ def reguralize_features(features):
 class ResNetFeatures(nn.Module):
     def __init__(self):
         super(ResNetFeatures, self).__init__()
-        model = models.resnet50(pretrained=True)
+        model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
 
         self.features = nn.Sequential(
             *list(model.children())[:-1]
