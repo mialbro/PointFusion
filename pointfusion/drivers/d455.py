@@ -2,7 +2,7 @@ import pyrealsense2 as rs
 import numpy as np
 import cv2
 
-from pointfusion import camera
+import pointfusion
 
 class D455:
     def __init__(self, width=1280, height=720, fps=30):
@@ -51,6 +51,9 @@ class D455:
             return rs.video_stream_profile(self._pipeline_profile.get_stream(rs.stream.color)).get_intrinsics()
         else:
             return self._color_frame.get_profile().as_video_stream_profile().get_intrinsics()
+    @property
+    def depth_scale(self):
+        return self._pipeline_profile.get_device().first_depth_sensor().get_depth_scale()
 
     def run(self):
         while True:
@@ -61,14 +64,13 @@ class D455:
                 self._depth_frame = aligned_frames.get_depth_frame()
                 self._color_frame = aligned_frames.get_color_frame()
 
-                depth_image = np.asanyarray(self._depth_frame.get_data())
+                depth_image = np.asanyarray(self._depth_frame.get_data()).astype(np.float32)
                 color_image = np.asanyarray(self._color_frame.get_data())
                 # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
                 depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
                 depth_colormap_dim = depth_colormap.shape
                 color_colormap_dim = color_image.shape
 
-                import pdb; pdb.set_trace()
                 # If depth and color resolutions are different, resize color image to match depth image for display
                 if depth_colormap_dim != color_colormap_dim:
                     resized_color_image = cv2.resize(color_image, dsize=(depth_colormap_dim[1], depth_colormap_dim[0]), interpolation=cv2.INTER_AREA)
@@ -81,8 +83,10 @@ class D455:
                 cv2.waitKey(1)
 
                 if self._camera is None:
-                    self._camera = camera.from_rs2(self.depth_intrinsics)
-                    import pdb; pdb.set_trace()
+                    self._camera = pointfusion.Camera.from_rs2(self.depth_intrinsics, self.depth_scale)
+                import pdb; pdb.set_trace()
+
+                depth_cloud = self._camera.depth_to_cloud(depth_image)
 
                 #yield depth_image, color_image
 

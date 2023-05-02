@@ -4,14 +4,15 @@ import open3d as o3d
 from scipy.spatial.transform import Rotation as R
 
 class Camera:
-    def __init__(self, camera_matrix=None, dist_coeffs=np.zeros(5), rotation=np.zeros(3), translation=np.zeros(3), frame_id='camera', parent_id='model'):
+    def __init__(self, camera_matrix=None, dist_coeffs=np.zeros(5), rotation=np.zeros(3), translation=np.zeros(3), depth_scale=1.0, frame_id='camera', parent_id='model'):
         # Intrinsics
         self._camera_matrix = np.asarray(camera_matrix).reshape((3, 3))
         self._dist_coeffs = np.asarray(dist_coeffs).reshape((5, 1))
+        self._depth_scale = depth_scale
 
         # Extrinsics
         if rotation.size == 3:
-            self._rotation = R.from_rotvec(np.asarray(rotation).reshape((3, 1)))
+            self._rotation = R.from_rotvec(np.asarray(rotation))
         elif rotation.size == 9:
             self._rotation = R.from_matrix(np.asarray(rotation).reshape((3, 3)))
         self._translation = np.asarray(translation).reshape((3, 1))
@@ -19,14 +20,14 @@ class Camera:
         self._parent_id = parent_id
 
     @classmethod
-    def from_rs2(cls, intrinsics):
+    def from_rs2(cls, intrinsics, depth_scale=1.0):
         camera_matrix = np.ones((3, 3))
         camera_matrix[0, 0] = intrinsics.fx
         camera_matrix[1, 1] = intrinsics.fy
         camera_matrix[0, 2] = intrinsics.ppx
         camera_matrix[1, 2] = intrinsics.ppy
         dist_coeffs = np.asarray(intrinsics.coeffs).reshape((5, 1))
-        return cls(camera_matrix=camera_matrix, dist_coeffs=dist_coeffs)
+        return cls(camera_matrix=camera_matrix, dist_coeffs=dist_coeffs, depth_scale=depth_scale)
 
     @property
     def frame_id(self):
@@ -83,7 +84,7 @@ class Camera:
         return (np.matmul(self.rmat, points.T) + self.tvec).T
     
     def undistort(self, points):
-        return cv2.undistortPoints(points, self.intrinsics, self.dist_coeffs)
+        return cv2.undistortPoints(uv, self.intrinsics, self._dist_coeffs)
     
     def backProject(self, uv, z): # [n x 2], [n x 1]
         # ([n x 2] - self.cx) / self.fx
@@ -104,13 +105,16 @@ class Camera:
         points = points[~np.isnan(points).any(axis=1)]
 
     def depth_to_cloud(self, depth):
+        depth = depth.astype(np.float32) * self._depth_scale
         valid = (depth > 0)
         u, v = np.meshgrid(np.arange(depth.shape[1]), np.arange(depth.shape[0]), sparse=False)
-        import pdb; pdb.set_trace()
+        uv = np.stack((u.flatten(), v.flatten()), axis=-1).astype(np.float32)
+        uv = np.squeeze(cv2.undistortPoints(uv, self.intrinsics, self._dist_coeffs))
         x = ((depth * (u - self.cx)) / self.fx)[valid == True].flatten()
         y = ((depth * (v - self.cy)) / self.fy)[valid == True].flatten()
         z = depth[valid == True].flatten()
         points = np.stack((x,y,z), axis=-1)
+
         return points
     
     def inverse(self):
