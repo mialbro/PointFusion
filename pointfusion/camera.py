@@ -1,20 +1,32 @@
+import cv2
 import numpy as np
 import open3d as o3d
 from scipy.spatial.transform import Rotation as R
 
-# camera = Camera(camera_matrix=self.intrinsics[index], rvec=self.rvecs[index], tvec=self.tvecs[index])
-
 class Camera:
-    def __init__(self, camera_matrix=None, rotation=None, translation=None, frame_id='camera', parent_id='model'):
+    def __init__(self, camera_matrix=None, dist_coeffs=np.zeros(5), rotation=np.zeros(3), translation=np.zeros(3), frame_id='camera', parent_id='model'):
+        # Intrinsics
         self._camera_matrix = np.asarray(camera_matrix).reshape((3, 3))
-        self._rotation = None
-        if len(rotation) == 3:
+        self._dist_coeffs = np.asarray(dist_coeffs).reshape((5, 1))
+
+        # Extrinsics
+        if rotation.size == 3:
             self._rotation = R.from_rotvec(np.asarray(rotation).reshape((3, 1)))
-        elif len(rotation) == 9:
+        elif rotation.size == 9:
             self._rotation = R.from_matrix(np.asarray(rotation).reshape((3, 3)))
         self._translation = np.asarray(translation).reshape((3, 1))
         self._frame_id = frame_id
         self._parent_id = parent_id
+
+    @classmethod
+    def from_rs2(cls, intrinsics):
+        camera_matrix = np.ones((3, 3))
+        camera_matrix[0, 0] = intrinsics.fx
+        camera_matrix[1, 1] = intrinsics.fy
+        camera_matrix[0, 2] = intrinsics.ppx
+        camera_matrix[1, 2] = intrinsics.ppy
+        dist_coeffs = np.asarray(intrinsics.coeffs).reshape((5, 1))
+        return cls(camera_matrix=camera_matrix, dist_coeffs=dist_coeffs)
 
     @property
     def frame_id(self):
@@ -70,6 +82,9 @@ class Camera:
     def transform(self, points):
         return (np.matmul(self.rmat, points.T) + self.tvec).T
     
+    def undistort(self, points):
+        return cv2.undistortPoints(points, self.intrinsics, self.dist_coeffs)
+    
     def backProject(self, uv, z): # [n x 2], [n x 1]
         # ([n x 2] - self.cx) / self.fx
         x = (uv - self.cx) / self.fx
@@ -80,9 +95,8 @@ class Camera:
         u, v = np.meshgrid(np.arange(depth.shape[1]), np.arange(depth.shape[0]), sparse=False)
         valid = (depth > 0) & (mask != False)
         z = np.where(valid, depth, np.nan)
-        x = np.where(valid, (z * (u - K['cx'])) / K['fx'], 0)
-        y = np.where(valid, (z * (v - K['cy'])) / K['fy'], 0)
-
+        x = np.where(valid, (z * (u - self.cx)) / self.fx, 0)
+        y = np.where(valid, (z * (v - self.cy)) / self.fy, 0)
         x = x.flatten()
         y = y.flatten()
         z = z.flatten()
@@ -92,6 +106,7 @@ class Camera:
     def depth_to_cloud(self, depth):
         valid = (depth > 0)
         u, v = np.meshgrid(np.arange(depth.shape[1]), np.arange(depth.shape[0]), sparse=False)
+        import pdb; pdb.set_trace()
         x = ((depth * (u - self.cx)) / self.fx)[valid == True].flatten()
         y = ((depth * (v - self.cy)) / self.fy)[valid == True].flatten()
         z = depth[valid == True].flatten()

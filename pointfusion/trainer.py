@@ -66,6 +66,7 @@ class Trainer:
                 # gradient descent
                 optimizer.step()
                 running_loss += loss.item()
+                print(loss.item())
 
             # Validation
             self.model.eval()

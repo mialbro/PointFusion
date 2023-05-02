@@ -10,8 +10,8 @@ from torch.utils.data import Dataset
 
 from torchvision import transforms
 
-import utils
-from camera import Camera
+from pointfusion import utils
+from pointfusion import Camera
 
 class LINEMOD(Dataset):
     def __init__(self, root_dir='../datasets/Linemod_preprocessed', point_sample=1000):
@@ -44,6 +44,7 @@ class LINEMOD(Dataset):
             self.masks += masks[:n]
             self.images += images[:n]
             self.models += [f'{os.path.join(root_dir, "models", f"obj_{i+1:02d}.ply")}'] * n
+            self.model_info = yaml.load(open(os.path.join(root_dir, 'models', 'models_info.yml')), Loader=yaml.FullLoader)
             self.ids += ids * n
 
             with open(os.path.join(path, 'info.yml')) as f:
@@ -69,6 +70,23 @@ class LINEMOD(Dataset):
         
         depth_cloud = camera.depth_to_cloud(depth)
         corners = utils.get_corners(model)
+        xx = ([self.model_info[id]['min_x'], self.model_info[id]['min_x'] + self.model_info[id]['size_x']])
+        yy = ([self.model_info[id]['min_y'], self.model_info[id]['min_y'] + self.model_info[id]['size_y']])
+        zz = ([self.model_info[id]['min_z'], self.model_info[id]['min_z'] + self.model_info[id]['size_z']])
+        cc = np.asarray(
+            [[xx[0], yy[0], zz[0]],
+            [xx[0], yy[0], zz[1]],
+            [xx[0], yy[1], zz[0]],
+            [xx[0], yy[1], zz[1]],
+            [xx[1], yy[0], zz[0]],
+            [xx[1], yy[0], zz[1]],
+            [xx[1], yy[1], zz[0]],
+            [xx[1], yy[1], zz[1]]]
+        )
+        corners = camera.transform(cc)
+        #import pdb; pdb.set_trace()
+        #utils.draw_([utils.to_lines(corners), utils.to_pcd(depth_cloud)])
+        #import pdb; pdb.set_trace()
         # per-point corner offsets
         corner_offsets = utils.get_corner_offsets(depth_cloud, corners)
 

@@ -10,7 +10,7 @@ def bbox_from_mask(mask):
     cmin, cmax = np.where(cols)[0][[0, -1]]
     return rmin, rmax, cmin, cmax
 
-def get_corners(points):
+def get_corners(points=None):
     """get the corners from the transformed pointcloud"""
     if isinstance(points, np.ndarray):
         pcd = o3d.geometry.PointCloud()

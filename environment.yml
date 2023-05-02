@@ -1,16 +1,27 @@
 name: pointfusion
 channels:
-  - defaults
   - pytorch
+  - anaconda
+  - open3d-admin
+  - nvidia
+  - eyeware
 dependencies:
+  - python=3.8
   - numpy
-  - pytorch
   - pillow
   - opencv
-  - torchvision
   - matplotlib
+  - open3d
+  - pip
   - pip:
     - torchsummary
     - scipy
-    - open3d
     - distinctipy
+    - scikit-learn
+    - pandas
+    - addict
+    - plyfile
+    - tqdm
+    - torch
+    - torchvision
+    - torchaudio

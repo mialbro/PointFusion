@@ -1,0 +1,20 @@
+version: "3.3"
+services:
+  pointfusion:
+    image: pointfusion
+    build:
+      context: .
+      args:
+        - USERNAME=${USER}
+    environment:
+      - DISPLAY=${DISPLAY}
+      - USERNAME=${USER}
+      - DEBIAN_FRONTEND=noninteractive
+    volumes:
+      - ./:/home/${USER}/pointfusion
+      - ./datasets:/home/${USER}/pointfusion/datasets
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    tty: true
+    stdin_open: true
+    privileged: true
+    network_mode: host
