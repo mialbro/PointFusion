@@ -104,8 +104,8 @@ class Camera:
         points = np.dstack((x, y, z))[0]
         points = points[~np.isnan(points).any(axis=1)]
 
-    def depth_to_cloud(self, depth):
-        depth = depth.astype(np.float32) * self._depth_scale
+    def depth_to_cloud(self, depth, color_image=None):
+        depth = depth * self._depth_scale
         valid = (depth > 0)
         u, v = np.meshgrid(np.arange(depth.shape[1]), np.arange(depth.shape[0]), sparse=False)
         uv = np.stack((u.flatten(), v.flatten()), axis=-1).astype(np.float32)
@@ -113,9 +113,10 @@ class Camera:
         x = ((depth * (u - self.cx)) / self.fx)[valid == True].flatten()
         y = ((depth * (v - self.cy)) / self.fy)[valid == True].flatten()
         z = depth[valid == True].flatten()
-        points = np.stack((x,y,z), axis=-1)
-
-        return points
+        points = np.stack((x, y ,z), axis=-1)
+        colors = color_image[valid == True].reshape(-1, 3)
+        #import pdb; pdb.set_trace()
+        return points, colors
     
     def inverse(self):
         rotation = np.transpose(self.rmat)

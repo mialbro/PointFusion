@@ -25,3 +25,5 @@ dependencies:
     - torch
     - torchvision
     - torchaudio
+    - pyrealsense2
+    - pyyaml

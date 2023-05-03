@@ -70,6 +70,12 @@ RUN apt-get update && \
         pkg-config \
         libgtk-3-dev
 
+RUN apt-get update && \
+    apt-get install -y \
+        mesa-utils \
+        libgl1-mesa-dri \
+        libgl1-mesa-glx
+
 RUN git clone https://github.com/IntelRealSense/librealsense.git && \
     cd librealsense && \
     mkdir build && \
@@ -81,14 +87,18 @@ RUN git clone https://github.com/IntelRealSense/librealsense.git && \
 ARG USERNAME
 RUN useradd -m ${USERNAME}
 RUN usermod -aG video ${USERNAME}
-RUN chown 1000:1000 /opt/conda/envs/pointfusion -R
 
 USER ${USERNAME}
 
 RUN mkdir -p /home/${USERNAME}/pointfusion
-WORKDIR /home/${USERNAME}/pointfusion/pointfusion
+WORKDIR /home/${USERNAME}/pointfusion
 
 RUN conda init bash
 RUN echo "conda activate pointfusion" >> ~/.bashrc
+RUN echo "pip install -e ." >> ~/.bashrc
 
+ENV LD_PRELOAD /usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.30
+
+#COPY . .
+#RUN pip install -e . --user
 ENTRYPOINT [ "/bin/bash" ]

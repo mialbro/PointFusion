@@ -1,11 +1,13 @@
 import pyrealsense2 as rs
 import numpy as np
 import cv2
+import open3d as o3d
 
 import pointfusion
 
 class D455:
-    def __init__(self, width=1280, height=720, fps=30):
+    def __init__(self, width=1280, height=720, fps=30, viewer=True):
+        self._viewer = viewer
         self._width = width
         self._height = height
         self._fps = fps
@@ -32,11 +34,17 @@ class D455:
         self._color_frame = None
         self._camera = None
 
+        if self._viewer:
+            self._vis = o3d.visualization.Visualizer()
+            self._vis.create_window()
+
     def __del__(self):
         if hasattr(self, '_pipeline') and self._pipeline is not None:
             self._pipeline.stop()
         if hasattr(self, '_device') and self._device is not None:
             self._device.hardware_reset()
+        if hasattr(self, '_vis') and self._vis is not None:
+            self._vis.destroy_window()
 
     @property
     def depth_intrinsics(self):
@@ -56,39 +64,35 @@ class D455:
         return self._pipeline_profile.get_device().first_depth_sensor().get_depth_scale()
 
     def run(self):
+        frame_count = 0
+        pcd = o3d.geometry.PointCloud()
         while True:
-            # Wait for a coherent pair of frames: depth and color
             ret, frames = self._pipeline.try_wait_for_frames(100)
             if ret is True:
                 aligned_frames = self._align.process(frames)
                 self._depth_frame = aligned_frames.get_depth_frame()
                 self._color_frame = aligned_frames.get_color_frame()
 
-                depth_image = np.asanyarray(self._depth_frame.get_data()).astype(np.float32)
-                color_image = np.asanyarray(self._color_frame.get_data())
-                # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
-                depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
-                depth_colormap_dim = depth_colormap.shape
-                color_colormap_dim = color_image.shape
-
-                # If depth and color resolutions are different, resize color image to match depth image for display
-                if depth_colormap_dim != color_colormap_dim:
-                    resized_color_image = cv2.resize(color_image, dsize=(depth_colormap_dim[1], depth_colormap_dim[0]), interpolation=cv2.INTER_AREA)
-                    images = np.hstack((resized_color_image, depth_colormap))
-                else:
-                    images = np.hstack((color_image, depth_colormap))
-                # Show images
-                cv2.imshow('RealSense', images)
-                print(depth_image.shape)
-                cv2.waitKey(1)
+                depth_image = np.asanyarray(self._depth_frame.get_data())
+                depth_image[depth_image > 3.0 / self.depth_scale] = 0
+                color_image = np.asanyarray(self._color_frame.get_data())[...,::-1]
 
                 if self._camera is None:
                     self._camera = pointfusion.Camera.from_rs2(self.depth_intrinsics, self.depth_scale)
-                import pdb; pdb.set_trace()
 
-                depth_cloud = self._camera.depth_to_cloud(depth_image)
+                points, colors = self._camera.depth_to_cloud(depth_image, color_image)
+                pcd.points = o3d.utility.Vector3dVector(points)
+                pcd.colors = o3d.utility.Vector3dVector(colors / 255.0)
 
-                #yield depth_image, color_image
+                if self._viewer is True:
+                    if frame_count == 0:
+                        self._vis.add_geometry(pcd)
+                    self._vis.update_geometry(pcd)
+                    self._vis.poll_events()
+                    self._vis.update_renderer()
+                    frame_count += 1
+                else:
+                    yield depth_image, color_image
 
 if __name__ == '__main__':
     d455 = D455()
