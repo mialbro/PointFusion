@@ -10,6 +10,7 @@ services:
       - DISPLAY=${DISPLAY}
       - USERNAME=${USER}
       - DEBIAN_FRONTEND=noninteractive
+      - NVIDIA_VISIBLE_DEVICES=all
     volumes:
       - ./:/home/${USER}/pointfusion
       - ./datasets:/home/${USER}/pointfusion/datasets

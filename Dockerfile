@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.1.1-base-ubuntu22.04
+FROM nvidia/cuda:11.7.1-cudnn8-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -84,6 +84,7 @@ RUN git clone https://github.com/IntelRealSense/librealsense.git && \
     make -j $(nproc) && \
     make install
 
+
 ARG USERNAME
 RUN useradd -m ${USERNAME}
 RUN usermod -aG video ${USERNAME}
@@ -98,6 +99,10 @@ RUN echo "conda activate pointfusion" >> ~/.bashrc
 RUN echo "pip install -e ." >> ~/.bashrc
 
 ENV LD_PRELOAD /usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.30
+
+ENV CUDA_HOME /usr/local/cuda
+ENV PATH $CUDA_HOME/bin:$PATH
+ENV LD_LIBRARY_PATH $CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
 #COPY . .
 #RUN pip install -e . --user

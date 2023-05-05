@@ -2,7 +2,7 @@ import pyrealsense2 as rs
 import numpy as np
 import open3d as o3d
 import pointfusion
-
+import cv2
 class D455(pointfusion.Camera):
     def __init__(self, width=1280, height=720, fps=30):
         self._width = width
@@ -45,9 +45,9 @@ class D455(pointfusion.Camera):
 
         depth_image = np.asanyarray(depth_frame.get_data())
         depth_image[depth_image > 3.0 / self.depth_scale] = 0
-        color_image = np.asanyarray(color_frame.get_data())[...,::-1]
+        color_image = np.asanyarray(color_frame.get_data())
 
-        points, colors = self.back_project(depth_image, color_image)
+        points, colors = self.back_project(depth_image, color_image[...,::-1])
         point_cloud = o3d.geometry.PointCloud()
         point_cloud.points = o3d.utility.Vector3dVector(points)
         point_cloud.colors = o3d.utility.Vector3dVector(colors / 255.0)
@@ -73,7 +73,22 @@ class D455(pointfusion.Camera):
         aligned_frames = self._align.process(frames)
         return aligned_frames
 
+'''
 if __name__ == '__main__':
+    vis = o3d.visualization.Visualizer()
+    vis.create_window()
+    pcd = o3d.geometry.PointCloud()
     camera = D455()
+    frame_count = 0
     for color_image, depth_image, point_cloud in camera:
-        print(point_cloud)
+        cv2.imshow("image", depth_image)
+        cv2.waitKey(1)
+        pcd.points = point_cloud.points
+        pcd.colors = point_cloud.colors
+        if frame_count == 0:
+            vis.add_geometry(pcd)
+        vis.update_geometry(pcd)
+        vis.poll_events()
+        vis.update_renderer()
+        frame_count += 1
+'''

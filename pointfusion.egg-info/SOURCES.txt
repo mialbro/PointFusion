@@ -7,7 +7,7 @@ pointfusion/datasets.py
 pointfusion/enums.py
 pointfusion/loss.py
 pointfusion/models.py
-pointfusion/pointfusion.py
+pointfusion/pf.py
 pointfusion/trainer.py
 pointfusion/utils.py
 pointfusion.egg-info/PKG-INFO
