@@ -1,10 +1,11 @@
 import torch
 import torchvision
 import trainer
+import pointfusion
 
 class PointFusion:
     def __init__(self):
-        self._camera = None
+        self._camera = pointfusion.D455()
         self._dataset = None
         self._trainer = None
         self._frcn = torchvision.models.detection.fasterrcnn_resnet50_fpn_v2(weights=torchvision.models.detection.FasterRCNN_ResNet50_FPN_V2_Weights.COCO_V1)
@@ -20,5 +21,12 @@ class PointFusion:
         cropped_clouds = []
         out = self._model(cropped_images, cropped_clouds)
 
+    def inference(self):
+        for depth_image, color_image in self._camera.run():
+            self.predict(depth_image, color_image)
 
-    def image_detection()
+pf = PointFusion()
+camera = pointfusion.D455()
+
+for (color_image, point_cloud) in camera:
+    pf.predict(color_image, point_cloud)
