@@ -3,17 +3,10 @@ import torch.nn as nn
 import torch.nn.parallel
 import torch.utils.data
 from torch.autograd import Variable
-import numpy as np
 import torch.nn.functional as F
 from torchvision import models
-
-def reguralize_features(features):
-    d = features.size()[1]
-    I = torch.eye(d)[None, :, :]
-    if features.is_cuda:
-        I = I.cuda()
-    loss = torch.mean(torch.norm(torch.bmm(features, features.transpose(2, 1) - I), dim=(1, 2)))
-    return loss
+import numpy as np
+import pointfusion
 
 class ResNetFeatures(nn.Module):
     def __init__(self):
@@ -50,13 +43,12 @@ class PointNetEncoder(nn.Module):
         trans = self.stn(x)
         x = x.transpose(2, 1)
         if D > 3 :
-            x, feature = x.split(3,dim=2)
+            x, feature = x.split(3, dim=2)
         x = torch.bmm(x, trans)
         if D > 3:
-            x = torch.cat([x,feature],dim=2)
+            x = torch.cat([x, feature], dim=2)
         x = x.transpose(2, 1)
 
-        pnt_feats = x
         x = F.relu(self.conv1(x))
         if self.feature_transform:
             trans_feat = self.fstn(x)
@@ -96,19 +88,20 @@ class STN3d(nn.Module):
 
     def forward(self, x):
         batchsize = x.size()[0]
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
+        x = self.relu(self.conv1(x))
+        x = self.relu(self.conv2(x))
+        x = self.relu(self.conv3(x))
 
         x = torch.max(x, 2, keepdim=True)[0]
         x = x.view(-1, 1024)
 
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
+        x = self.relu(self.fc1(x))
+        x = self.relu(self.fc2(x))
         x = self.fc3(x)
 
-        iden = Variable(torch.from_numpy(np.array([1, 0, 0, 0, 1, 0, 0, 0, 1]).astype(np.float32))).view(1, 9).repeat(
-            batchsize, 1)
+        iden = Variable(
+            torch.from_numpy(
+            np.array([1, 0, 0, 0, 1, 0, 0, 0, 1]).astype(np.float32))).view(1, 9).repeat(batchsize, 1)
         if x.is_cuda:
             iden = iden.cuda()
         x = x + iden
@@ -157,9 +150,10 @@ class STNkd(nn.Module):
         x = x.view(-1, self.k, self.k)
         return x
 
-class PointFusionNet(nn.Module):
+class PointFusion(nn.Module):
     def __init__(self, pnt_cnt=100):
-        super(PointFusionNet, self).__init__()
+        super(PointFusion, self).__init__()
+        self.pnt_cnt = pnt_cnt
         self.image_embedding = ResNetFeatures()
         self.cloud_embedding = PointNetEncoder(feature_transform=True, channel=3)
 
@@ -177,7 +171,7 @@ class PointFusionNet(nn.Module):
         self.softmax = nn.Softmax(dim=0)
 
     def forward(self, image, cloud):
-        B, N, D = cloud.shape
+        B, N, D = cloud.size()
         # extract rgb (1 x 2048) features from image patch
         image_feats = self.image_embedding(image)
         # extract point-wise (n x 64) and global (1 x 1024) features from pointcloud
@@ -187,7 +181,6 @@ class PointFusionNet(nn.Module):
         global_feats = global_feats.repeat(1, D, 1)
         # concatenate features along columns
         dense_feats = torch.cat([image_feats, point_feats, global_feats], 2)
-        #dense_feats = self.fusion_dropout(dense_feats)
         # pass features through mlp
         x = self.fc1(dense_feats) # (n x 3136)
         x = self.relu(x)

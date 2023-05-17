@@ -1,3 +1,4 @@
-# ignore datasets folder
 datasets/*
+weights/*
 __pycache__/*
+pointfusion.egg-info/*

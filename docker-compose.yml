@@ -1,4 +1,4 @@
-version: "3.3"
+version: "3.2"
 services:
   pointfusion:
     image: pointfusion
@@ -19,3 +19,10 @@ services:
     stdin_open: true
     privileged: true
     network_mode: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

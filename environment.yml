@@ -12,6 +12,10 @@ dependencies:
   - opencv
   - matplotlib
   - open3d
+  - pytorch=*=*cuda*
+  - pytorch::torchvision
+  - pytorch::torchaudio
+  - pytorch-cuda=11.7
   - pip
   - pip:
     - torchsummary
@@ -22,8 +26,5 @@ dependencies:
     - addict
     - plyfile
     - tqdm
-    - torch
-    - torchvision
-    - torchaudio
     - pyrealsense2
     - pyyaml

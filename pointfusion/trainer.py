@@ -1,17 +1,17 @@
 import torch
+torch.cuda.empty_cache()
+
 import numpy as np
 
-import models
-from enums import Mode
-from datasets import LINEMOD
-from loss import unsupervised_loss, corner_loss
+import pointfusion
 
 class Trainer:
-    def __init__(self) -> None:
+    def __init__(self, path='../weights/pointfusion.pt') -> None:
+        self._path = path
         # hyperparameters
         self.lr = 1e-3
         self.weight_decay = 1e-5
-        self.batch_size = 3
+        self.batch_size = 10
         self.epochs = 20
         self._dataset = None
         self._test_set = None
@@ -20,8 +20,8 @@ class Trainer:
         self._val_loader = None
         self._device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    def save_checkpoint(self, model, epoch, optimizer, loss, path):
-        torch.save({'epoch': epoch, 'model': model.state_dict(), 'optimizer': optimizer.state_dict(), 'loss': loss}, path)
+    def save_checkpoint(self, epoch, loss):
+        torch.save({'epoch': epoch, 'model_state_dict': self._model.state_dict(), 'optimizer': self._optimizer.state_dict(), 'loss': loss}, f'../weights/pointfusion_{epoch}.pt')
 
     @property
     def model(self):
@@ -30,6 +30,7 @@ class Trainer:
     @model.setter
     def model(self, model):
         self._model = model.to(self._device)
+        self._model.train()
 
     @property
     def dataset(self):
@@ -44,15 +45,16 @@ class Trainer:
 
     def fit(self):
         # loss and optimizer
-        criterion = unsupervised_loss
-        optimizer = torch.optim.Adam(self._model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        criterion = pointfusion.loss.unsupervised
+        self._optimizer = torch.optim.Adam(self._model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
+        stats = {'train_loss': [], 'val_loss': []}
         for epoch in range(self.epochs):
             # Training
             self.model.train()
             running_loss = 0.0
             for batch_idx, (id, cropped_image, cloud, corners, corner_offsets) in enumerate(self._train_loader):
-                optimizer.zero_grad()
+                self._optimizer.zero_grad()
                 # output from database
                 cropped_image = cropped_image.to(self._device)
                 corners = corners.to(self._device)
@@ -64,15 +66,16 @@ class Trainer:
                 # backward
                 loss.backward()
                 # gradient descent
-                optimizer.step()
+                self._optimizer.step()
                 running_loss += loss.item()
-                print(loss.item())
+                stats['train_loss'].append(loss.item())
+                print(f'Epoch: {epoch + 1}/{self.epochs} | Batch: {batch_idx+1}/{len(self._train_loader)} | Loss: {loss.item():.4f}')
+            self._train_loader.dataset.dataset.point_count = np.random.randint(100, 1000)
 
             # Validation
             self.model.eval()
             with torch.no_grad():
-                total_loss = 0.0
-                total_correct = 0
+                val_loss = 0.0
                 for (id, cropped_image, cloud, corners, corner_offsets) in self._val_loader:
                     image = cropped_image.to(self._device)
                     corners = corners.to(self._device)
@@ -80,16 +83,14 @@ class Trainer:
                     cloud = cloud.to(self._device)
 
                     outputs = self.model(image, cloud)  # forward pass
-                    loss = criterion(outputs, targets)  # calculate the loss
-                    total_loss += loss.item() * image.size(0)  # accumulate loss
-                    _, predicted = outputs.max(1)
-                    total_correct += predicted.eq(targets).sum().item()  # accumulate correct predictions
+                    loss = criterion(outputs[0], outputs[1], targets)  # calculate the loss
+                    val_loss += loss.item()
+                    stats['val_loss'].append(val_loss)
+                print('Validation Loss: {:.4f}'.format(val_loss / len(self._val_loader)))
 
-                # Calculate validation metrics
-                val_loss = total_loss / len(self._test_set)
-                val_acc = total_correct / len(self._test_set)
 
-trainer = Trainer()
-trainer.model = models.PointFusionNet()
-trainer.dataset = LINEMOD()
-trainer.fit()
+if __name__ == '__main__':
+    trainer = Trainer()
+    trainer.model = pointfusion.models.PointFusion()
+    trainer.dataset = pointfusion.datasets.LINEMOD()
+    trainer.fit()

@@ -1,13 +1,12 @@
 README.md
 setup.py
 pointfusion/__init__.py
-pointfusion/_utils.py
 pointfusion/camera.py
 pointfusion/datasets.py
 pointfusion/enums.py
+pointfusion/inference.py
 pointfusion/loss.py
 pointfusion/models.py
-pointfusion/pf.py
 pointfusion/trainer.py
 pointfusion/utils.py
 pointfusion.egg-info/PKG-INFO

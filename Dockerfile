@@ -84,6 +84,8 @@ RUN git clone https://github.com/IntelRealSense/librealsense.git && \
     make -j $(nproc) && \
     make install
 
+RUN apt-get install -y \
+    nvidia-cuda-toolkit
 
 ARG USERNAME
 RUN useradd -m ${USERNAME}

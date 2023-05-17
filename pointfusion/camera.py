@@ -24,15 +24,18 @@ class Camera:
             self._camera_matrix[0, 2] = intrinsics.ppx
             self._camera_matrix[1, 2] = intrinsics.ppy
             self._dist_coeffs = np.asarray(intrinsics.coeffs).reshape((5, 1))
-        elif isinstance(intrinsics, np.ndarray):
+        elif isinstance(camera_matrix, np.ndarray):
             self._camera_matrix = np.asarray(camera_matrix).reshape((3, 3))
-            self._dist_coeffs = np.asarray(dist_coeffs).reshape((5, 1))
+        elif isinstance(camera_matrix, list):
+            self._camera_matrix = np.asarray(camera_matrix).reshape((3, 3))
+        self._dist_coeffs = np.asarray(dist_coeffs).reshape((5, 1))
         self._depth_scale = depth_scale
 
         # Extrinsics
-        if rotation.size == 3:
+        numel = len(rotation) if isinstance(rotation, list) else rotation.size
+        if numel == 3:
             self._rotation = R.from_rotvec(np.asarray(rotation))
-        elif rotation.size == 9:
+        elif numel == 9:
             self._rotation = R.from_matrix(np.asarray(rotation).reshape((3, 3)))
         self._translation = np.asarray(translation).reshape((3, 1))
         self._frame_id = frame_id
@@ -56,7 +59,10 @@ class Camera:
     
     @property
     def pose(self):
-        return self._extrinsics
+        pose = np.eye(4)
+        pose[:3, :3] = self.rmat
+        pose[:3, 3] = self.tvec.reshape((3,))
+        return pose
     
     @property
     def rmat(self):
@@ -72,7 +78,8 @@ class Camera:
     
     @property
     def projection_matrix(self):
-        return np.multiply(self.intrinsics, self.extrinsics)
+        tmat = self.pose[:3, :]
+        return np.matmul(self.intrinsics, tmat)
     
     @property
     def fx(self):
@@ -91,7 +98,12 @@ class Camera:
         return self.intrinsics[1, 2]
     
     def project(self, points):
-        return np.matmul(self.projection_matrix, points)
+        if points.ndim == 1:
+            points = points.reshape((3, 1))
+            points = np.vstack((points, np.ones((1, 1))))
+            image_points = np.matmul(self.projection_matrix, points)
+            image_points = image_points / image_points[2, :]
+            return image_points[:2, :]
     
     def transform(self, points):
         return (np.matmul(self.rmat, points.T) + self.tvec).T
@@ -106,7 +118,10 @@ class Camera:
         y = ((depth * (v - self.cy)) / self.fy)[valid == True].flatten()
         z = depth[valid == True].flatten()
         points = np.stack((x, y ,z), axis=-1)
-        colors = color_image[valid == True].reshape(-1, 3)
+        if color_image is not None:
+            colors = color_image[valid == True].reshape(-1, 3)
+        else:
+            colors = np.ones((points.shape[0], 3))
         return points, colors
     
     def inverse(self):

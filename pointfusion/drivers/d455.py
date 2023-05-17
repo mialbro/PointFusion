@@ -3,6 +3,7 @@ import numpy as np
 import open3d as o3d
 import pointfusion
 import cv2
+
 class D455(pointfusion.Camera):
     def __init__(self, width=1280, height=720, fps=30):
         self._width = width

@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 
-def supervised_loss():
+def supervised():
     pass
 
-def unsupervised_loss(pred_offsets, pred_scores, offsets):
+def unsupervised(pred_offsets, pred_scores, offsets):
     eps = 1e-16
     weight = 0.1
     L1 = nn.SmoothL1Loss(reduction='none')
