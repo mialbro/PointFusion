@@ -88,7 +88,6 @@ class Trainer:
                     stats['val_loss'].append(val_loss)
                 print('Validation Loss: {:.4f}'.format(val_loss / len(self._val_loader)))
 
-
 if __name__ == '__main__':
     trainer = Trainer()
     trainer.model = pointfusion.models.PointFusion()

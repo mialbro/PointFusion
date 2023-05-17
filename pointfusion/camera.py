@@ -104,6 +104,11 @@ class Camera:
             image_points = np.matmul(self.projection_matrix, points)
             image_points = image_points / image_points[2, :]
             return image_points[:2, :]
+        elif points.ndim == 2:
+            points = np.vstack((points, np.ones((1, points.shape[1]))))
+            image_points = np.matmul(self.projection_matrix, points)
+            image_points = image_points / image_points[2, :]
+            return image_points[:2, :]
     
     def transform(self, points):
         return (np.matmul(self.rmat, points.T) + self.tvec).T

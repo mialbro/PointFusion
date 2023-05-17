@@ -33,10 +33,10 @@ class LINEMOD(Dataset):
         self.cloud_transform = None
 
         for i, path in enumerate(sorted(glob.glob(os.path.join(root_dir, 'data', '*')))):
+            ids = [int(path.split('/')[-1])]
             depths = sorted(glob.glob(os.path.join(path, 'depth', '*.png')))
             masks = sorted(glob.glob(os.path.join(path, 'mask', '*.png')))
             images = sorted(glob.glob(os.path.join(path, 'rgb', '*.png')))
-            ids = [int(path.split('/')[-1])]
 
             n = min([len(depths), len(masks), len(images)])
             self.depths += depths[:n]
