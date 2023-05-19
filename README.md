@@ -8,7 +8,7 @@ cd PointFusion
 docker-compose build pointfusion
 
 ## Usage (Training)
-```
+```python
 import pointfusion
 
 trainer = pointfusion.Trainer()
@@ -18,7 +18,7 @@ trainer.fit()
 ```
 
 ## Usage (Inference)
-```
+```python
 import pointfusion
 
 inference = pointfusion.Inference()
