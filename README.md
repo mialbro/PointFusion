@@ -44,13 +44,13 @@ for (color, depth, point_cloud) in inference.camera:
 
 ## Devices
 * Currently support IntelRealsense cameras (D4**)
-* To expand library to support additional cameras create child class from camera.Camera() as done with d455.D455()
+* To expand library to support additional cameras create child class from camera.Camera
 
 ```python
 class ZED(pointfusion.Camera):
     def __init__(self, width=1280, height=720, fps=30):
         ...
-        
+
     def next(self):
     ...
     return color, depth, point_cloud
