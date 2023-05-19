@@ -1,6 +1,27 @@
 import numpy as np
 import open3d as o3d
 import distinctipy
+import cv2
+
+def draw_corners(image, points):
+    # https://github.com/sk-aravind/3D-Bounding-Boxes-From-Monocular-Images/blob/98e9e7caf98edc6a6841d3eac7bd6f62b6866e10/lib/Utils.py#L315
+    for point in points:
+        cv2.circle(image, (int((point[0])), int((point[1]))), 5, (0, 0, 255), -1)
+
+    points = points.astype(np.int64)
+    cv2.line(image, (points[0][0], points[0][1]), (points[2][0], points[2][1]), (0, 0, 255), 3)
+    cv2.line(image, (points[4][0], points[4][1]), (points[6][0], points[6][1]), (0, 0, 255), 3)
+    cv2.line(image, (points[0][0], points[0][1]), (points[4][0], points[4][1]), (0, 0, 255), 3)
+    cv2.line(image, (points[2][0], points[2][1]), (points[6][0], points[6][1]), (0, 0, 255), 3)
+
+    cv2.line(image, (points[1][0], points[1][1]), (points[3][0], points[3][1]), (0, 0, 255), 3)
+    cv2.line(image, (points[1][0], points[1][1]), (points[5][0], points[5][1]), (0, 0, 255), 3)
+    cv2.line(image, (points[7][0], points[7][1]), (points[3][0], points[3][1]), (0, 0, 255), 3)
+    cv2.line(image, (points[7][0], points[7][1]), (points[5][0], points[5][1]), (0, 0, 255), 3)
+
+    for i in range(0, 7, 2):
+        cv2.line(image, (points[i][0], points[i][1]), (points[i+1][0], points[i+1][1]), (0, 0, 255), 3)
+    return image
 
 def bbox_from_mask(mask):
     """get the bounding box corners from a mask"""

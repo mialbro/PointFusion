@@ -1,9 +1,8 @@
 import torch
-torch.cuda.empty_cache()
-
 import numpy as np
-
 import pointfusion
+
+torch.cuda.empty_cache()
 
 class Trainer:
     def __init__(self, path='../weights/pointfusion.pt') -> None:
@@ -70,7 +69,7 @@ class Trainer:
                 running_loss += loss.item()
                 stats['train_loss'].append(loss.item())
                 print(f'Epoch: {epoch + 1}/{self.epochs} | Batch: {batch_idx+1}/{len(self._train_loader)} | Loss: {loss.item():.4f}')
-            self._train_loader.dataset.dataset.point_count = np.random.randint(100, 1000)
+                self._train_loader.dataset.dataset.point_count = np.random.randint(100, 1000)
 
             # Validation
             self.model.eval()

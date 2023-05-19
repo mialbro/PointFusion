@@ -2,7 +2,6 @@ import pyrealsense2 as rs
 import numpy as np
 import open3d as o3d
 import pointfusion
-import cv2
 
 class D455(pointfusion.Camera):
     def __init__(self, width=1280, height=720, fps=30):
@@ -73,23 +72,3 @@ class D455(pointfusion.Camera):
             ret, frames = self._pipeline.try_wait_for_frames(100)
         aligned_frames = self._align.process(frames)
         return aligned_frames
-
-'''
-if __name__ == '__main__':
-    vis = o3d.visualization.Visualizer()
-    vis.create_window()
-    pcd = o3d.geometry.PointCloud()
-    camera = D455()
-    frame_count = 0
-    for color_image, depth_image, point_cloud in camera:
-        cv2.imshow("image", depth_image)
-        cv2.waitKey(1)
-        pcd.points = point_cloud.points
-        pcd.colors = point_cloud.colors
-        if frame_count == 0:
-            vis.add_geometry(pcd)
-        vis.update_geometry(pcd)
-        vis.poll_events()
-        vis.update_renderer()
-        frame_count += 1
-'''

@@ -30,7 +30,9 @@ class LINEMOD(Dataset):
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
 
-        self.cloud_transform = None
+        self.cloud_transform = transforms.Compose([
+            transforms.ToTensor(),
+        ])
 
         for i, path in enumerate(sorted(glob.glob(os.path.join(root_dir, 'data', '*')))):
             ids = [int(path.split('/')[-1])]
@@ -82,18 +84,14 @@ class LINEMOD(Dataset):
                 for z in zz:
                     cc.append([x, y, z])
         cc = np.asarray(cc)
+        uv = camera.project(cc)
+        image = pointfusion.utils.draw_corners(image, uv)
+
+        cv2.imshow("image", image)
+        cv2.waitKey(0)
 
         corners = camera.transform(cc)
         corner_offsets = pointfusion.utils.get_corner_offsets(depth_cloud, corners)
-
-        '''
-        temp = image[:, :, ::-1].copy()
-        for corner in cc:
-            x, y = camera.project(corner)
-            cv2.circle(temp, (int(x), int(y)), 5, (255, 0, 0), -1)
-        cv2.imshow(f'image', temp)
-        cv2.waitKey(0)
-        '''
         sample = np.random.choice(depth_cloud.shape[0], self.point_count, replace=True)
         #sample = np.arange(depth_cloud.shape[0])
         corner_offsets = corner_offsets[sample]
