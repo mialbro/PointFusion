@@ -28,9 +28,9 @@ class Inference:
         self._camera = camera
 
     def predict(self, color_image, depth_image):
-        cv2.imshow("color_image", color_image)
-        cv2.waitKey(1)
-        return
+        #cv2.imshow("color_image", color_image)
+        #cv2.waitKey(1)
+        #return
         tensor_image = torch.from_numpy(np.transpose(color_image.copy() / 255.0, (2, 0, 1))).float().unsqueeze(0)
         tensor_image = tensor_image.to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
         outputs = self._frcn(tensor_image)
@@ -53,7 +53,6 @@ class Inference:
                     self._model(tensor_image, point_cloud)
 
 if __name__ == '__main__':
-    import pdb; pdb.set_trace()
     pf = pointfusion.Inference()
     pf.camera = pointfusion.D455()
 
