@@ -9,6 +9,11 @@ cd PointFusion
 docker-compose build pointfusion
 ```
 
+## LINMEMOD
+```
+cd PointFusion/datasets
+```
+* Download https://drive.google.com/file/d/11YzXNEyeQY7DcNZZZ6SVn732_EqMSopv/view?usp=sharing
 
 ## Training
 ```python
