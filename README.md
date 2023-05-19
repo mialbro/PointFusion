@@ -3,11 +3,14 @@
  - Regresses spatial offsets from object points and its 3D bounding box
 
 ## Installation (Docker)
+```
 git clone https://github.com/mialbro/PointFusion.git
 cd PointFusion
 docker-compose build pointfusion
+```
 
-## Usage (Training)
+
+## Training
 ```python
 import pointfusion
 
@@ -17,7 +20,7 @@ trainer.dataset = pointfusion.datasets.LINEMOD()
 trainer.fit()
 ```
 
-## Usage (Inference)
+## Inference
 ```python
 import pointfusion
 
