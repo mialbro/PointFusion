@@ -1,7 +1,9 @@
+
 import cv2
 import torch
 import torchvision
 import numpy as np
+
 import pointfusion
 
 class Inference:
@@ -13,9 +15,8 @@ class Inference:
         self._frcn = torchvision.models.detection.fasterrcnn_resnet50_fpn_v2(weights=torchvision.models.detection.FasterRCNN_ResNet50_FPN_V2_Weights.COCO_V1)
         self._frcn.eval()
         self._frcn.to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
-
         self._model = pointfusion.PointFusion()
-        self._model.load_state_dict(torch.load('../weights/pointfusion.pth'))
+        self._model.load_state_dict(torch.load('../weights/pointfusion_19.pth'))
         self._model.eval()
 
     @property
@@ -27,6 +28,9 @@ class Inference:
         self._camera = camera
 
     def predict(self, color_image, depth_image):
+        cv2.imshow("color_image", color_image)
+        cv2.waitKey(1)
+        return
         tensor_image = torch.from_numpy(np.transpose(color_image.copy() / 255.0, (2, 0, 1))).float().unsqueeze(0)
         tensor_image = tensor_image.to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
         outputs = self._frcn(tensor_image)
@@ -49,6 +53,7 @@ class Inference:
                     self._model(tensor_image, point_cloud)
 
 if __name__ == '__main__':
+    import pdb; pdb.set_trace()
     pf = pointfusion.Inference()
     pf.camera = pointfusion.D455()
 

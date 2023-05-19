@@ -2,8 +2,6 @@ import torch
 import numpy as np
 import pointfusion
 
-torch.cuda.empty_cache()
-
 class Trainer:
     def __init__(self, path='../weights/pointfusion.pt') -> None:
         self._path = path

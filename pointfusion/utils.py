@@ -21,6 +21,7 @@ def draw_corners(image, points):
 
     for i in range(0, 7, 2):
         cv2.line(image, (points[i][0], points[i][1]), (points[i+1][0], points[i+1][1]), (0, 0, 255), 3)
+    
     return image
 
 def bbox_from_mask(mask):
