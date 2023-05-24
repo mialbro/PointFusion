@@ -4,13 +4,12 @@ import torch.nn as nn
 def supervised():
     pass
 
-def unsupervised(pred_offsets, pred_scores, offsets):
-    eps = 1e-16
-    weight = 0.1
+def unsupervised(pred_offsets, pred_scores, offsets, eps=1e-16, weight=0.1):
     L1 = nn.SmoothL1Loss(reduction='none')
-    loss_offset = L1(pred_offsets, offsets) # [B x pnts x 8 x 3]
-    loss_offset = torch.mean(loss_offset, dim=(2, 3)) # [B x pnts]
-    loss = ((loss_offset * pred_scores) - (weight * torch.log(pred_scores + eps)))
+    #import pdb; pdb.set_trace()
+    loss = L1(pred_offsets, offsets).sum(dim=(1, 2))
+    #loss = torch.mean(loss_offset, dim=(1, 2)) # [B x pnts]
+    loss = ((loss * pred_scores) - (weight * torch.log(pred_scores + eps)))
     return loss.mean()
 
 def corner_loss(pred_corners, true_corners):

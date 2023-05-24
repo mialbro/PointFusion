@@ -1,10 +1,11 @@
+import open3d as o3d
+
 import torch
 import numpy as np
 import pointfusion
 
 class Trainer:
-    def __init__(self, path='../weights/pointfusion.pt') -> None:
-        self._path = path
+    def __init__(self) -> None:
         # hyperparameters
         self.lr = 1e-3
         self.weight_decay = 1e-5
@@ -17,8 +18,8 @@ class Trainer:
         self._val_loader = None
         self._device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    def save_checkpoint(self, epoch, loss):
-        torch.save({'epoch': epoch, 'model_state_dict': self._model.state_dict(), 'optimizer': self._optimizer.state_dict(), 'loss': loss}, f'../weights/pointfusion_{epoch}.pt')
+    def save_checkpoint(self, epoch):
+        torch.save(self._model.state_dict(), f'../weights/pointfusion_{epoch}.pt')
 
     @property
     def model(self):
@@ -67,7 +68,10 @@ class Trainer:
                 running_loss += loss.item()
                 stats['train_loss'].append(loss.item())
                 print(f'Epoch: {epoch + 1}/{self.epochs} | Batch: {batch_idx+1}/{len(self._train_loader)} | Loss: {loss.item():.4f}')
-                self._train_loader.dataset.dataset.point_count = np.random.randint(100, 1000)
+                if batch_idx ==20:
+                    break
+            
+            #self.save_checkpoint(epoch)
 
             # Validation
             self.model.eval()
@@ -76,14 +80,18 @@ class Trainer:
                 for (id, cropped_image, cloud, corners, corner_offsets) in self._val_loader:
                     image = cropped_image.to(self._device)
                     corners = corners.to(self._device)
+                    corners = corners.permute(0, 2, 1)
                     targets = corner_offsets.to(self._device)
                     cloud = cloud.to(self._device)
-
+    
                     outputs = self.model(image, cloud)  # forward pass
+                    import pdb; pdb.set_trace()
+                    '''
                     loss = criterion(outputs[0], outputs[1], targets)  # calculate the loss
                     val_loss += loss.item()
                     stats['val_loss'].append(val_loss)
-                print('Validation Loss: {:.4f}'.format(val_loss / len(self._val_loader)))
+                    '''
+                #print('Validation Loss: {:.4f}'.format(val_loss / len(self._val_loader)))
 
 if __name__ == '__main__':
     trainer = Trainer()

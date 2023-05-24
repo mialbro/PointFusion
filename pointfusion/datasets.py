@@ -1,10 +1,11 @@
+import open3d as o3d
+
 import os
 import glob
 import yaml
 import cv2
 import torch
 import numpy as np
-import open3d as o3d
 from PIL import Image
 from torch.utils.data import Dataset
 
@@ -13,7 +14,7 @@ from torchvision import transforms
 import pointfusion
 
 class LINEMOD(Dataset):
-    def __init__(self, root_dir='../datasets/Linemod_preprocessed', point_count=2000):
+    def __init__(self, root_dir='../datasets/Linemod_preprocessed', point_count=400):
         self.depths = []
         self.masks = []
         self.images = []
@@ -84,22 +85,31 @@ class LINEMOD(Dataset):
                 for z in zz:
                     cc.append([x, y, z])
         cc = np.asarray(cc)
+
+        '''
         uv = camera.project(cc)
         image = pointfusion.utils.draw_corners(image, uv)
-
         cv2.imshow("image", image)
         cv2.waitKey(0)
+        '''
 
         corners = camera.transform(cc)
+        
         corner_offsets = pointfusion.utils.get_corner_offsets(depth_cloud, corners)
-        sample = np.random.choice(depth_cloud.shape[0], self.point_count, replace=True)
-        #sample = np.arange(depth_cloud.shape[0])
+        if depth_cloud.shape[0] > self.point_count:
+            sample = np.random.choice(depth_cloud.shape[0], self.point_count, replace=False)
+        else:
+            sample = np.random.choice(depth_cloud.shape[0], self.point_count, replace=True)
+        
         corner_offsets = corner_offsets[sample]
         # sample depth point cloud
         depth_cloud = np.transpose(depth_cloud[sample])
         # crop image
         rmin, rmax, cmin, cmax = pointfusion.utils.bbox_from_mask(mask)
         cropped_image = Image.fromarray(image[rmin:rmax, cmin:cmax])
+        
+        # rearrange corner offset dimensions
+        corner_offsets = np.swapaxes(corner_offsets, 0, 2)
 
         return id, self.image_transform(cropped_image), torch.from_numpy(depth_cloud).to(torch.float), torch.from_numpy(corners), torch.from_numpy(corner_offsets)
 

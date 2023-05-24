@@ -1,10 +1,13 @@
+import open3d as o3d
+
 import torch
 import torch.nn as nn
-import torch.nn.parallel
 import torch.utils.data
-from torch.autograd import Variable
-import torch.nn.functional as F
+import torch.nn.parallel
 from torchvision import models
+import torch.nn.functional as F
+from torch.autograd import Variable
+
 import numpy as np
 import pointfusion
 
@@ -168,7 +171,7 @@ class PointFusion(nn.Module):
 
         self.fusion_dropout = nn.Dropout2d(p=0.4)
         self.relu = torch.nn.ReLU()
-        self.softmax = nn.Softmax(dim=0)
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, image, cloud):
         B, N, D = cloud.size()
@@ -190,9 +193,22 @@ class PointFusion(nn.Module):
         x = self.relu(x) # (n x 128)
         # get corner offsets (n x 8 x 3) to 3d corners for each point
         corner_offsets = self.fc4(x)
-        corner_offsets = corner_offsets.view(B, D, 8, 3)
+        corner_offsets = corner_offsets.view(B, N, 8, D) #   (B, D, 8, 3)
         # obtain pdf ranking each offset to 3d bounding box
         scores = self.fc5(x)
         scores = self.softmax(scores)
         scores = scores.view(B, D)
-        return corner_offsets, scores
+        
+        if self.training is False:
+            indices = torch.argmax(scores, dim=1)
+            # top scores
+            scores = scores[torch.arange(B), indices]
+            # top scoring points
+            points = cloud[torch.arange(B), :, indices]
+            # top scoring corner offsets
+            offsets = corner_offsets[torch.arange(B), :, :, indices]
+            # corners
+            corners = torch.sub(points.unsqueeze(-1), offsets)
+            return corners, scores
+        else:
+            return corner_offsets, scores

@@ -1,7 +1,8 @@
-import numpy as np
 import open3d as o3d
-import distinctipy
+
 import cv2
+import numpy as np
+import distinctipy
 
 def draw_corners(image, points):
     # https://github.com/sk-aravind/3D-Bounding-Boxes-From-Monocular-Images/blob/98e9e7caf98edc6a6841d3eac7bd6f62b6866e10/lib/Utils.py#L315

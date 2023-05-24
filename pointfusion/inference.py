@@ -1,13 +1,13 @@
+import open3d as o3d
 
 import cv2
 import torch
 import torchvision
 import numpy as np
-
 import pointfusion
 
 class Inference:
-    def __init__(self, pth='../weights/pointfusion_0.pth'):
+    def __init__(self, path):
         self._dataset = None
         self._trainer = None
         self._camera = None
@@ -16,7 +16,9 @@ class Inference:
         self._frcn.eval()
         self._frcn.to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
         self._model = pointfusion.PointFusion()
-        self._model.load_state_dict(torch.load(pth))
+        #self._model.load_state_dict(torch.load(path))
+        import pdb; pdb.set_trace()
+
         self._model.eval()
 
     @property
@@ -55,7 +57,7 @@ class Inference:
         return scores, corners
 
 if __name__ == '__main__':
-    inference = pointfusion.Inference()
+    inference = pointfusion.Inference('../weights/pointfusion_0.pt')
     inference.camera = pointfusion.D455()
 
     for (color, depth, point_cloud) in inference.camera:
