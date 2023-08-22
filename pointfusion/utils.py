@@ -4,6 +4,21 @@ import cv2
 import numpy as np
 import distinctipy
 
+import torch
+from torch import nn
+from torchvision import transforms
+
+class NormalizePointCloud:
+    def __call__(self, points):
+        B, C, N = points.size()
+        mean = points.mean(dim=2)
+        points = points - mean.unsqueeze(2)
+        distance = torch.sqrt(torch.sum(torch.abs(points) ** 2, dim=1))
+        distance = distance.max(dim=1)[0].unsqueeze(1).unsqueeze(1)
+        points = (points / distance)
+        points = (points + 1) / 2
+        return points.view(C, N)
+
 def draw_corners(image, points):
     # https://github.com/sk-aravind/3D-Bounding-Boxes-From-Monocular-Images/blob/98e9e7caf98edc6a6841d3eac7bd6f62b6866e10/lib/Utils.py#L315
     for point in points:
@@ -110,3 +125,4 @@ def corners_from_offsets(points, corner_offsets):
     for i in range(0, 8):
         corners[i, :] = points[0, :] - corner_offsets[0, i, :]
     return corners
+ 

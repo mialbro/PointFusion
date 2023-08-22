@@ -9,11 +9,13 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 import numpy as np
-import pointfusion
 
-class ResNetFeatures(nn.Module):
+class ResNet(nn.Module):
     def __init__(self):
-        super(ResNetFeatures, self).__init__()
+        super(ResNet, self).__init__()
+        self.relu = nn.ReLU()
+        self.conv1 = nn.Conv1d(2048, 3048, 1)
+        self.conv2 = nn.Conv1d(3048, 2048, 1)
         model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
 
         self.features = nn.Sequential(
@@ -21,56 +23,57 @@ class ResNetFeatures(nn.Module):
         )
 
     def forward(self, x):
-        batch = x.size(0)
+        B = x.size(0)
         x = self.features(x)
-        x = x.squeeze()
-        x = x.view(batch, 1, 2048)
+        x = x.view(B, -1, 1)
+        x = self.relu(self.conv1(x))
+        x = self.relu(self.conv2(x))
         return x
 
-class PointNetEncoder(nn.Module):
+class PointNet(nn.Module):
     def __init__(self, feature_transform=True, channel=3):
-        super(PointNetEncoder, self).__init__()
-        self.stn = STN3d(channel)
+        super(PointNet, self).__init__()
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(p=0.3)
+        self.input_transform = STN3d(channel)
+        self.feature_transform = STNkd(k=64)
         self.conv1 = torch.nn.Conv1d(channel, 64, 1)
         self.conv2 = torch.nn.Conv1d(64, 128, 1)
         self.conv3 = torch.nn.Conv1d(128, 1024, 1)
+        self.conv4 = torch.nn.Conv1d(64, 64, 1)
+        self.conv5 = torch.nn.Conv1d(1088, 512, 1)
+        self.conv6 = torch.nn.Conv1d(512, 256, 1)
+        self.conv7 = torch.nn.Conv1d(256, 128, 1)
         self.bn1 = nn.BatchNorm1d(64)
         self.bn2 = nn.BatchNorm1d(128)
         self.bn3 = nn.BatchNorm1d(1024)
-        self.feature_transform = feature_transform
-        if self.feature_transform:
-            self.fstn = STNkd(k=64)
+        self.bn4 = nn.BatchNorm1d(64)
+        self.bn5 = nn.BatchNorm1d(512)
+        self.bn6 = nn.BatchNorm1d(256)
+        self.bn7 = nn.BatchNorm1d(128)
 
     def forward(self, x):
         B, D, N = x.size()
-        trans = self.stn(x)
-        x = x.transpose(2, 1)
-        if D > 3 :
-            x, feature = x.split(3, dim=2)
-        x = torch.bmm(x, trans)
-        if D > 3:
-            x = torch.cat([x, feature], dim=2)
-        x = x.transpose(2, 1)
+        transform = self.input_transform(x)
+        x = torch.bmm(transform, x)
+        x = self.relu(self.conv1(x))
+        x = self.relu(self.conv4(x))
+        feature = self.feature_transform(x)
+        x = torch.bmm(feature, x)
+        point_features = x
+        # Global features
+        global_features = self.relu(self.conv2(x))
+        global_features = self.relu(self.conv3(global_features))
+        global_features = self.relu(torch.max(global_features, 2, keepdim=False)[0])
+        # Concatenate global and local features
+        fusion_features = global_features.view(-1, 1024, 1).repeat(1, 1, N)
+        fusion_features = torch.cat([point_features, fusion_features], 1)
+        fusion_features = self.relu(self.conv5(fusion_features))
+        fusion_features = self.relu(self.conv6(fusion_features))
+        fusion_features = self.relu(self.conv7(fusion_features))
+        global_features = self.relu(global_features.unsqueeze(2))
 
-        x = F.relu(self.conv1(x))
-        if self.feature_transform:
-            trans_feat = self.fstn(x)
-            x = x.transpose(2, 1)
-            x = torch.bmm(x, trans_feat)
-            x = x.transpose(2, 1)
-        else:
-            trans_feat = None
-
-        pointfeat = x
-        pointfeat = pointfeat.permute(0, 2, 1)
-
-        x = F.relu(self.conv2(x))
-        x = self.conv3(x)
-
-        x = torch.max(x, 2, keepdim=True)[0]
-        x = x.view(B, -1, 1024)
-        globalfeat = x
-        return pointfeat, globalfeat
+        return point_features, global_features, fusion_features
 
 class STN3d(nn.Module):
     def __init__(self, channel):
@@ -102,9 +105,7 @@ class STN3d(nn.Module):
         x = self.relu(self.fc2(x))
         x = self.fc3(x)
 
-        iden = Variable(
-            torch.from_numpy(
-            np.array([1, 0, 0, 0, 1, 0, 0, 0, 1]).astype(np.float32))).view(1, 9).repeat(batchsize, 1)
+        iden = torch.from_numpy(np.eye(3).flatten().astype(np.float32)).view(1, 9).repeat(batchsize, 1)
         if x.is_cuda:
             iden = iden.cuda()
         x = x + iden
@@ -114,14 +115,13 @@ class STN3d(nn.Module):
 class STNkd(nn.Module):
     def __init__(self, k=64):
         super(STNkd, self).__init__()
+        self.relu = nn.ReLU()
         self.conv1 = torch.nn.Conv1d(k, 64, 1)
         self.conv2 = torch.nn.Conv1d(64, 128, 1)
         self.conv3 = torch.nn.Conv1d(128, 1024, 1)
         self.fc1 = nn.Linear(1024, 512)
         self.fc2 = nn.Linear(512, 256)
         self.fc3 = nn.Linear(256, k * k)
-        self.relu = nn.ReLU()
-
         self.bn1 = nn.BatchNorm1d(64)
         self.bn2 = nn.BatchNorm1d(128)
         self.bn3 = nn.BatchNorm1d(1024)
@@ -145,8 +145,7 @@ class STNkd(nn.Module):
 
         x = self.fc3(x)
 
-        iden = Variable(torch.from_numpy(np.eye(self.k).flatten().astype(np.float32))).view(1, self.k * self.k).repeat(
-            batchsize, 1)
+        iden = Variable(torch.from_numpy(np.eye(self.k).flatten().astype(np.float32))).view(1, self.k * self.k).repeat(batchsize, 1)
         if x.is_cuda:
             iden = iden.cuda()
         x = x + iden
@@ -157,47 +156,58 @@ class PointFusion(nn.Module):
     def __init__(self, pnt_cnt=100):
         super(PointFusion, self).__init__()
         self.pnt_cnt = pnt_cnt
-        self.image_embedding = ResNetFeatures()
-        self.cloud_embedding = PointNetEncoder(feature_transform=True, channel=3)
-
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(32, 16, kernel_size=3, padding=1)
-
-        self.fc1 = nn.Linear(3136, 512)
-        self.fc2 = nn.Linear(512, 128)
-        self.fc3 = nn.Linear(128, 128)
-        self.fc4 = nn.Linear(128, 24)
-        self.fc5 = nn.Linear(128, 1)
+        self.resnet = ResNet()
+        self.pointnet = PointNet(feature_transform=True, channel=3)
+        self.relu = torch.nn.ReLU()
+        self.conv1 = torch.nn.Conv1d(3136, 512, 1)
+        self.conv2 = torch.nn.Conv1d(512, 128, 1)
+        self.conv3 = torch.nn.Conv1d(128, 128, 1)
+        self.conv4 = torch.nn.Conv1d(128, 24, 1)
+        self.conv5 = torch.nn.Conv1d(24, 24, 1)
+        self.conv6 = torch.nn.Conv1d(24, 12, 1)
+        self.conv7 = torch.nn.Conv1d(12, 1, 1)
+        self.conv8 = torch.nn.Conv1d(6, 3, 1)
+        self.conv9 = torch.nn.Conv1d(3, 1, 1)
 
         self.fusion_dropout = nn.Dropout2d(p=0.4)
-        self.relu = torch.nn.ReLU()
-        self.softmax = nn.Softmax(dim=1)
+        self.softmax = nn.Softmax(dim=2)
 
     def forward(self, image, cloud):
         B, N, D = cloud.size()
         # extract rgb (1 x 2048) features from image patch
-        image_feats = self.image_embedding(image)
+        image_features = self.resnet(image)
         # extract point-wise (n x 64) and global (1 x 1024) features from pointcloud
-        point_feats, global_feats = self.cloud_embedding(cloud)
+        point_features, global_features, fusion_features = self.pointnet(cloud)
+
         # duplicate first row for each point in the pointcloud
-        image_feats = image_feats.repeat(1, D, 1)
-        global_feats = global_feats.repeat(1, D, 1)
+        image_features = image_features.repeat(1, 1, D)
+        global_features = global_features.repeat(1, 1, D)
         # concatenate features along columns
-        dense_feats = torch.cat([image_feats, point_feats, global_feats], 2)
+        dense_features = torch.cat([image_features, point_features, global_features], 1)
         # pass features through mlp
-        x = self.fc1(dense_feats) # (n x 3136)
-        x = self.relu(x)
-        x = self.fc2(x)
-        x = self.relu(x)
-        x = self.fc3(x)
-        x = self.relu(x) # (n x 128)
+        x = self.relu(self.conv1(dense_features))
+        x = self.relu(self.conv2(x))
+        x = self.relu(self.conv3(x))
+
         # get corner offsets (n x 8 x 3) to 3d corners for each point
-        corner_offsets = self.fc4(x)
-        corner_offsets = corner_offsets.view(B, N, 8, D) #   (B, D, 8, 3)
+        x = self.conv4(x)
+        corner_offsets = x.view(B, N, 8, D) #   (B, D, 8, 3)
+        
         # obtain pdf ranking each offset to 3d bounding box
-        scores = self.fc5(x)
+        x = self.relu(x)
+
+        scores = self.relu(self.conv5(x))
+        scores = self.relu(self.conv6(scores))
+        scores = self.conv7(scores)
+        #scores = self.relu(self.conv8(scores))
+        #scores = self.relu(self.conv9(scores))
+
+        import pdb; pdb.set_trace()
+        print((scores.min(), scores.max()))
+
         scores = self.softmax(scores)
-        scores = scores.view(B, D)
+
+        scores = scores.squeeze(0)
         
         if self.training is False:
             indices = torch.argmax(scores, dim=1)
@@ -207,8 +217,18 @@ class PointFusion(nn.Module):
             points = cloud[torch.arange(B), :, indices]
             # top scoring corner offsets
             offsets = corner_offsets[torch.arange(B), :, :, indices]
+
             # corners
-            corners = torch.sub(points.unsqueeze(-1), offsets)
+            corners = torch.zeros(B, 3, 8).cuda()
+            corners[:, :, 0] = points - offsets[:, :, 0]
+            corners[:, :, 1] = points - offsets[:, :, 1]
+            corners[:, :, 2] = points - offsets[:, :, 2]
+            corners[:, :, 3] = points - offsets[:, :, 3]
+            corners[:, :, 4] = points - offsets[:, :, 4]
+            corners[:, :, 5] = points - offsets[:, :, 5]
+            corners[:, :, 6] = points - offsets[:, :, 6]
+            corners[:, :, 7] = points - offsets[:, :, 7]
+
             return corners, scores
         else:
             return corner_offsets, scores

@@ -4,7 +4,11 @@ import cv2
 import torch
 import torchvision
 import numpy as np
-import pointfusion
+
+from models import PointFusion
+from datasets import LINEMOD
+from d455 import D455
+import utils
 
 class Inference:
     def __init__(self, path):
@@ -15,7 +19,7 @@ class Inference:
         self._frcn = torchvision.models.detection.fasterrcnn_resnet50_fpn_v2(weights=torchvision.models.detection.FasterRCNN_ResNet50_FPN_V2_Weights.COCO_V1)
         self._frcn.eval()
         self._frcn.to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
-        self._model = pointfusion.PointFusion()
+        self._model = PointFusion()
         #self._model.load_state_dict(torch.load(path))
         import pdb; pdb.set_trace()
 
@@ -48,7 +52,7 @@ class Inference:
                 depth = np.zeros(depth_image.shape, dtype=depth_image.dtype)
                 depth[box[1]:box[3], box[0]:box[2]] = depth_image[box[1]:box[3], box[0]:box[2]]
                 point_cloud, _ = self.camera.back_project(depth, color_image)
-                if point_cloud.shape[0] > 100:
+                if point_cloud.shape[0] >= 400:
                     point_cloud = torch.from_numpy(np.transpose(point_cloud)).float().unsqueeze(0)
                     point_cloud = point_cloud.to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
                     curr_scores, curr_corners = self._model(tensor_image, point_cloud)
@@ -57,14 +61,14 @@ class Inference:
         return scores, corners
 
 if __name__ == '__main__':
-    inference = pointfusion.Inference('../weights/pointfusion_0.pt')
-    inference.camera = pointfusion.D455()
+    inference = Inference('../weights/pointfusion_0.pt')
+    inference.camera = D455()
 
     for (color, depth, point_cloud) in inference.camera:
         scores, corners = inference.predict(color, depth)
         for (curr_scores, curr_corners) in zip(scores, corners):
             image_points = inference.camera.project(curr_corners)
-            color = pointfusion.utils.draw_corners(color, image_points)
+            color = utils.draw_corners(color, image_points)
         cv2.imshow("image", color)
         cv2.waitKey(1)
 

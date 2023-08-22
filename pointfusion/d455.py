@@ -1,9 +1,10 @@
 import open3d as o3d
 import pyrealsense2 as rs
 import numpy as np
-import pointfusion
 
-class D455(pointfusion.Camera):
+from camera import Camera
+
+class D455(Camera):
     def __init__(self, width=1280, height=720, fps=30):
         self._width = width
         self._height = height
