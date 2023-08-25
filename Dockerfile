@@ -34,43 +34,15 @@ RUN apt update && \
         mesa-utils \
         libgl1-mesa-dri \
         libgl1-mesa-glx \
-        nvidia-cuda-toolkit
+        curl
 
-RUN git clone https://github.com/llvm-mirror/openmp.git && \
-    cd openmp && \
-    mkdir build && \
-    cd build && \
-    cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ .. && \
-    make -j $(nproc) && \
-    make install -j $(nproc) && \
-    make PREFIX=/usr/local install -j $(nproc)
+RUN curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh"
+RUN chmod +x Mambaforge-$(uname)-$(uname -m).sh
+RUN ./Mambaforge-$(uname)-$(uname -m).sh -b -p /opt/mamba
 
-RUN git clone https://github.com/xianyi/OpenBLAS.git && \
-    cd OpenBLAS && \
-    mkdir build && \
-    cd build && \
-    cmake \
-        -DUSE_OPENMP=1 \
-        -DCMAKE_C_COMPILER=gcc \
-        -DCMAKE_CXX_COMPILER=g++ .. && \
-    make -j $(nproc) && \
-    make install -j $(nproc)
-
-RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
-    bash Miniconda3-latest-Linux-x86_64.sh -b -p /opt/conda && \
-    rm Miniconda3-latest-Linux-x86_64.sh
-
-ENV PATH /opt/conda/bin:$PATH
+ENV PATH /opt/mamba/bin:$PATH
 COPY environment.yml .
-RUN conda env create -f environment.yml
-
-RUN git clone https://github.com/IntelRealSense/librealsense.git && \
-    cd librealsense && \
-    mkdir build && \
-    cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=release -DCMAKE_BUILD_TYPE=release -DBUILD_PYTHON_BINDINGS:bool=true && \
-    make -j $(nproc) && \
-    make install
+RUN mamba env create -f environment.yml
 
 ARG USERNAME
 RUN useradd -m ${USERNAME}
@@ -83,12 +55,10 @@ WORKDIR /home/${USERNAME}/pointfusion
 
 RUN conda init bash
 RUN echo "conda activate pointfusion" >> ~/.bashrc
-#RUN echo "pip install -e ." >> ~/.bashrc
 
-ENV LD_PRELOAD /usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.30
-
-ENV CUDA_HOME /usr/local/cuda
-ENV PATH $CUDA_HOME/bin:$PATH
-ENV LD_LIBRARY_PATH $CUDA_HOME/lib64:$LD_LIBRARY_PATH
+#ENV LD_PRELOAD /usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.30
+#ENV CUDA_HOME /usr/local/cuda
+#ENV PATH $CUDA_HOME/bin:$PATH
+#ENV LD_LIBRARY_PATH $CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
 ENTRYPOINT [ "/bin/bash" ]

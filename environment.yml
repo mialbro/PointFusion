@@ -16,6 +16,9 @@ dependencies:
   - pytorch::torchvision
   - pytorch::torchaudio
   - pytorch-cuda=11.7
+  - conda-forge::librealsense
+  - conda-forge::openmp
+  - conda-forge::openblas
   - pip
   - pip:
     - torchsummary
