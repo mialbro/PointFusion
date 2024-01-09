@@ -1,21 +1,41 @@
-import open3d as o3d
-
 import cv2
 import numpy as np
 import pyrealsense2 as rs
 from scipy.spatial.transform import Rotation as R
 
+from typing import Optional
+
 class Camera:
+    """
+    Pinhole camera model
+    Args:
+        intrinsics (rs.pyrealsense2.intrinsics): RealSense camera model
+        camera_matrix (np.ndarray): Camera intrinsics matrix
+        dist_coeffs (np.ndarray): Distortion coefficients
+        rotation (np.ndarray): Rotation matrix
+        translation (np.ndarray): Translation vector
+        depth_scale (float): Depth scale
+        frame_id (str): Current camera frame
+        parent_id (str): Camera parent frame
+    Attributes:
+        _camera_matrix (np.ndarray)
+        _dist_coeffs (np.ndarray)
+        _depth_scale (float)
+        _translation (np.ndarray)
+        _rotation (np.ndarray)
+        _frame_id (str)
+        _parent_id (str)
+        """
     def __init__(
             self,
-            intrinsics=None,
-            camera_matrix=np.eye(3), 
-            dist_coeffs=np.zeros(5), 
-            rotation=np.zeros(3), 
-            translation=np.zeros(3), 
-            depth_scale=1.0, 
-            frame_id='camera', 
-            parent_id='model'
+            intrinsics: Optional[rs.pyrealsense2.intrinsics] = None,
+            camera_matrix: Optional[np.ndarray] = np.eye(3), 
+            dist_coeffs: Optional[np.ndarray] = np.zeros(5), 
+            rotation: Optional[np.ndarray] = np.zeros(3), 
+            translation: Optional[np.ndarray] = np.zeros(3), 
+            depth_scale: Optional[float] = 1.0, 
+            frame_id: Optional[str] = 'camera', 
+            parent_id: Optional[str] = 'model'
         ):
         # Intrinsics
         if isinstance(intrinsics, rs.pyrealsense2.intrinsics):
@@ -43,62 +63,120 @@ class Camera:
         self._parent_id = parent_id
 
     @property
-    def frame_id(self):
+    def frame_id(self) -> str:
+        """
+        Get frame id from camera
+        """
         return self._frame_id
     
     @property
-    def parent_id(self):
+    def parent_id(self) -> str:
+        """
+        Get parent id from camera
+        """
         return self._parent_id
 
     @property
-    def intrinsics(self):
+    def intrinsics(self) -> np.ndarray:
+        """
+        Get camera matrix from camera
+        """
         return self._camera_matrix
     
     @property
-    def camera_matrix(self):
+    def camera_matrix(self) -> np.ndarray:
+        """
+        Get camera matrix from camera
+        """
         return self._camera_matrix
     
     @property
-    def pose(self):
+    def pose(self) -> np.ndarray:
+        """
+        Get 3D rigid transformation
+        """
         pose = np.eye(4)
         pose[:3, :3] = self.rmat
         pose[:3, 3] = self.tvec.reshape((3,))
         return pose
     
     @property
-    def rmat(self):
+    def rmat(self) -> np.ndarray:
+        """
+        Get rotation matrix
+        """
         return self._rotation.as_matrix()
     
     @property
-    def rvec(self):
+    def rvec(self) -> np.ndarray:
+        """
+        Get rotation vector
+        """
         return self._rotation.as_rotvec()
     
     @property
-    def tvec(self):
+    def tvec(self) -> np.ndarray:
+        """
+        Get translation vector
+        """
         return self._translation
     
     @property
-    def projection_matrix(self):
+    def projection_matrix(self) -> np.ndarray:
+        """
+        Get projection matrix
+        """
         tmat = self.pose[:3, :]
         return np.matmul(self.intrinsics, tmat)
     
     @property
-    def fx(self):
+    def fx(self) -> float:
+        """
+        Get focal length (x)
+        """
         return self.intrinsics[0, 0]
     
     @property
-    def fy(self):
+    def fy(self) -> float:
+        """
+        Get focal length (y)
+        """
         return self.intrinsics[1, 1]
     
     @property
-    def cx(self):
+    def cx(self) -> float:
+        """
+        Get optical center (x)
+        """
         return self.intrinsics[0, 2]
     
     @property
-    def cy(self):
+    def cy(self) -> float:
+        """
+        Get optical center (y)
+        """
         return self.intrinsics[1, 2]
-    
-    def project(self, points):
+
+    def transform(self, points: np.ndarray) -> np.ndarray:
+        """
+        Transform 3D points into camera frame
+        """
+        return (np.matmul(self.rmat, points.T) + self.tvec).T
+
+    def inverse(self):
+        """
+        Return inverse of camera
+        """
+        rotation = np.transpose(self.rmat)
+        translation = -np.matmul(rotation, self.tvec)
+        rotation = rotation.flatten().tolist()
+        translation = translation.flatten().tolist()
+        return Camera(camera_matrix=self.intrinsics, rotation=rotation, translation=translation)
+
+    def project(self, points: np.ndarray) -> np.ndarray:
+        """
+        Project object points into camera frame
+        """
         if points.ndim == 1:
             points = points.reshape((3, 1))
             points = np.vstack((points, np.ones((1, 1))))
@@ -111,11 +189,11 @@ class Camera:
             image_points = image_points / image_points[-1, :]
             image_points = np.transpose(image_points)[:, :2]
             return image_points
-    
-    def transform(self, points):
-        return (np.matmul(self.rmat, points.T) + self.tvec).T
 
-    def back_project(self, depth, color_image=None):
+    def back_project(self, depth: np.ndarray, color_image: Optional[np.ndarray] = None) -> np.ndarray:
+        """
+        Back project image points using camera model and depth
+        """
         depth = depth * self._depth_scale
         valid = (depth > 0)
         u, v = np.meshgrid(np.arange(depth.shape[1]), np.arange(depth.shape[0]), sparse=False)
@@ -130,10 +208,3 @@ class Camera:
         else:
             colors = np.ones((points.shape[0], 3))
         return points, colors
-    
-    def inverse(self):
-        rotation = np.transpose(self.rmat)
-        translation = -np.matmul(rotation, self.tvec)
-        rotation = rotation.flatten().tolist()
-        translation = translation.flatten().tolist()
-        return Camera(camera_matrix=self.intrinsics, rotation=rotation, translation=translation)

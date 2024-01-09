@@ -1,4 +1,5 @@
 datasets/*
 weights/*
 __pycache__/
+pointfusion/__pycache__/
 pointfusion.egg-info/

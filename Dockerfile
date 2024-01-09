@@ -1,4 +1,4 @@
-FROM nvidia/cuda:11.7.1-cudnn8-devel-ubuntu22.04
+FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -17,7 +17,6 @@ RUN apt update && \
         pkg-config \
         libgtk-3-dev \
         v4l-utils \
-        qt6-base-dev \
         libgl1-mesa-dri \
         mesa-utils \
         libxkbcommon-x11-0 \
@@ -51,14 +50,9 @@ RUN usermod -aG video ${USERNAME}
 USER ${USERNAME}
 
 RUN mkdir -p /home/${USERNAME}/pointfusion
-WORKDIR /home/${USERNAME}/pointfusion
+WORKDIR /home/${USERNAME}/pointfusion/examples
 
 RUN conda init bash
 RUN echo "conda activate pointfusion" >> ~/.bashrc
-
-#ENV LD_PRELOAD /usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.30
-#ENV CUDA_HOME /usr/local/cuda
-#ENV PATH $CUDA_HOME/bin:$PATH
-#ENV LD_LIBRARY_PATH $CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
 ENTRYPOINT [ "/bin/bash" ]

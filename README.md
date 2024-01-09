@@ -3,9 +3,11 @@
  - Regresses spatial offsets from object points and its 3D bounding box
 
 ## Dependencies:
-* docker 
-* nvidia-container-runtime
-* docker-compose >= v1.28
+* CUDA Toolkit (https://developer.nvidia.com/cuda-downloads)
+* docker (https://docs.docker.com/engine/install/ubuntu/)
+* docker-compose >= v1.28 (https://docs.docker.com/compose/install/linux/)
+* nvidia-container-toolkit (https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+* nvidia-docker2 (https://www.ibm.com/docs/en/masv-and-l/maximo-vi/continuous-delivery?topic=planning-installing-docker-nvidia-docker2)
 
 ## Installation (Docker)
 ```
@@ -24,9 +26,21 @@ cd PointFusion/datasets
 ```python
 import pointfusion
 
+model_name = pointfusion.ModelName.DenseFusion
+modalities = [ pointfusion.Modality.RGB, pointfusion.Modality.POINT_CLOUD ]
+
+model = pointfusion.DenseFusion(point_count=400, modalities=modalities)
+dataset = pointfusion.LINEMOD(point_count=400, model_name=model_name)
+loss_fcn = pointfusion.loss.dense_fusion
+
 trainer = pointfusion.Trainer()
-trainer.model = pointfusion.models.PointFusion()
-trainer.dataset = pointfusion.datasets.LINEMOD()
+trainer.batch_size = 5
+trainer.lr = 0.01
+trainer.weight_decay = 0.001
+trainer.model = model
+trainer.loss_fcn = loss_fcn
+trainer.dataset = dataset
+
 trainer.fit()
 ```
 
@@ -34,24 +48,12 @@ trainer.fit()
 ```python
 import pointfusion
 
+camera = pointfusion.D455()
 inference = pointfusion.Inference()
-inference.camera = pointfusion.D455()
 
-for (color, depth, point_cloud) in inference.camera:
-    corners = pf.predict(color, depth)
-
+for (color, depth, point_cloud) in camera:
+    corners = pf(color, depth)
 ```
 
 ## Devices
 * Currently support IntelRealsense cameras (D4**)
-* To expand library to support additional cameras create child class from camera.Camera
-
-```python
-class ZED(pointfusion.Camera):
-    def __init__(self, width=1280, height=720, fps=30):
-        ...
-
-    def next(self):
-    ...
-    return color, depth, point_cloud
-```

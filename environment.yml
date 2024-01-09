@@ -11,11 +11,10 @@ dependencies:
   - pillow
   - opencv
   - matplotlib
-  - open3d
   - pytorch=*=*cuda*
   - pytorch::torchvision
   - pytorch::torchaudio
-  - pytorch-cuda=11.7
+  - pytorch-cuda=12.1
   - conda-forge::librealsense
   - conda-forge::openmp
   - conda-forge::openblas
@@ -31,3 +30,4 @@ dependencies:
     - tqdm
     - pyrealsense2
     - pyyaml
+    - open3d

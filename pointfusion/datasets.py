@@ -1,21 +1,59 @@
-import open3d as o3d
-import utils
 import os
 import glob
 import yaml
 import cv2
 import torch
 import numpy as np
+import open3d as o3d
 from PIL import Image
+from torchvision import transforms
 from torch.utils.data import Dataset
 
-from torchvision import transforms
+from typing import Optional
 
-from camera import Camera
-import utils
+import pointfusion.utils as utils
+from pointfusion.camera import Camera
+from pointfusion.enums import ModelName
+
+class NormalizePointCloud:
+    def __call__(self, point_cloud):
+        B, C, N = point_cloud.size()
+        mean = point_cloud.mean(dim=2)
+        point_cloud = point_cloud - mean.unsqueeze(2)
+        distance = torch.sqrt(torch.sum(torch.abs(point_cloud) ** 2, dim=1))
+        distance = distance.max(dim=1)[0].unsqueeze(1).unsqueeze(1)
+        point_cloud = (point_cloud / distance)
+        point_cloud = (point_cloud + 1) / 2
+        return point_cloud.view(C, N)
 
 class LINEMOD(Dataset):
-    def __init__(self, root_dir='../datasets/Linemod_preprocessed', point_count=400):
+    """
+    LINEMOD dataset reader
+    Attributes:
+        model_name (pointfusion.ModalityName): Name of pointfusion model used
+        depths (list): List of depth images
+        masks (list): 
+        images (list):
+        rvecs (list)
+        tvecs (list):
+        intrinsics (list): 
+        models (list):
+        ids (list):
+        point_count (int):
+        image_transform (torchvision.transforms):
+        cloud_transform (torchvision.transforms):
+    Args:
+        root_dir (Optional[str]): Data directory
+        point_count (Optional[int]):
+        model_name (Optional[pointfusion.ModelName]):
+    """
+    def __init__(
+            self, 
+            root_dir: Optional[str] = '../datasets/Linemod_preprocessed', 
+            point_count: Optional[int] = 400, 
+            model_name: Optional[ModelName] = ModelName.DenseFusion
+    ) -> None:
+        self.model_name = model_name
         self.depths = []
         self.masks = []
         self.images = []
@@ -34,7 +72,7 @@ class LINEMOD(Dataset):
 
         self.cloud_transform = transforms.Compose([
             transforms.ToTensor(),
-            utils.NormalizePointCloud()
+            NormalizePointCloud()
         ])
 
         for i, path in enumerate(sorted(glob.glob(os.path.join(root_dir, 'data', '*')))):
@@ -64,7 +102,14 @@ class LINEMOD(Dataset):
                             self.tvecs += [ gt[k][j]['cam_t_m2c'] ]
             break
             
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> tuple:
+        """
+        Extracts input and target data
+        Args:
+            index (int): Index of data in dataset
+        Returns:
+            Input and target data
+        """
         id = self.ids[index]
         depth = np.array(Image.open(self.depths[index]))
         mask = np.array(Image.open(self.masks[index]))
@@ -73,6 +118,7 @@ class LINEMOD(Dataset):
         
         camera = Camera(camera_matrix=self.intrinsics[index], rotation=self.rvecs[index], translation=self.tvecs[index])
         model = camera.transform(model)
+
         image = np.where(mask, image, np.nan).astype(image.dtype)
         depth = np.where(mask[:, :, 0], depth, np.nan).astype(depth.dtype)
 
@@ -103,19 +149,32 @@ class LINEMOD(Dataset):
         # crop image
         rmin, rmax, cmin, cmax = utils.bbox_from_mask(mask)
 
+        #import pdb; pdb.set_trace()
         #image_ = np.zeros(image.shape, dtype=image.dtype)
         #image_[rmin:rmax, cmin:cmax] = image[rmin:rmax, cmin:cmax]
+        #image_ = Image.fromarray(image)
         image_ = Image.fromarray(image[rmin:rmax, cmin:cmax])
+
+        #import pdb; pdb.set_trace()
         
         # rearrange corner offset dimensions
         corner_offsets = np.swapaxes(corner_offsets, 0, 2)
+        corners = np.swapaxes(corners, 0, 1)
 
-        return id, self.image_transform(image_), self.cloud_transform(depth_cloud).to(torch.float), torch.from_numpy(corners), torch.from_numpy(corner_offsets) # , torch.from_numpy(np.asarray(self.rvecs[index]).reshape((3, 3))).to(torch.float)
+        if self.model_name is ModelName.GlobalFusion:
+            return id, self.image_transform(image_), self.cloud_transform(depth_cloud).to(torch.float), torch.from_numpy(corners)
+        elif self.model_name is ModelName.DenseFusion:
+            return id, self.image_transform(image_), self.cloud_transform(depth_cloud).to(torch.float), torch.from_numpy(corner_offsets)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.ids)
     
-    def split(self, ratio=0.8):
+    def split(self, ratio: Optional[float] = 0.8) -> torch.utils.data.Dataset:
+        """
+        Splits dataset using ratio
+        Returns:
+            Split dataset
+        """
         train_size = int(ratio * len(self))
         test_size = int(len(self) - train_size)
         return torch.utils.data.random_split(self, [train_size, test_size])
