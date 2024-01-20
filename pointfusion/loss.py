@@ -28,6 +28,11 @@ def dense_fusion(input: torch.Tensor, target, w: float = 0.1, eps: float = 1e-16
     corners = input[1]
     L1 = torch.nn.SmoothL1Loss(reduction='none')
     loss = L1(corners, target).sum(dim=(1, 2))
-    loss = (loss * scores) - (w * torch.log(scores + eps)) # as log approaches zero it grows negatively
+    #loss = (loss * scores) - (w * torch.log(scores + eps)) # as log approaches zero it grows negatively
     loss = loss.mean()
+    #import pdb; pdb.set_trace()
+    print(f'LOSS : {loss}')
+    #print(corners)
+    #print(target)
+    #print()
     return loss

@@ -13,18 +13,45 @@ from typing import Optional
 
 import pointfusion.utils as utils
 from pointfusion.camera import Camera
-from pointfusion.enums import ModelName
+from pointfusion.enums import ModelName, Modality
+
+def normalize(mean, distance, points):
+    points = points - mean
+    points = ((points / distance) + 1) / 2
+    return points
+
+def normalize_point_cloud(points: np.ndarray, mean: float, distance: float) -> np.ndarray:
+    
+    points = points - mean.unsqueeze(2)
+    distance = distance.max(dim=1)[0].unsqueeze(1).unsqueeze(1)
+    points = (points / distance)
+    points = (points + 1) / 2
+    return points
 
 class NormalizePointCloud:
-    def __call__(self, point_cloud):
-        B, C, N = point_cloud.size()
-        mean = point_cloud.mean(dim=2)
-        point_cloud = point_cloud - mean.unsqueeze(2)
-        distance = torch.sqrt(torch.sum(torch.abs(point_cloud) ** 2, dim=1))
+    def __call__(self, points):
+        '''
+        B, C, N = points.size()
+        mean = points.mean(dim=2)
+        points = points - mean.unsqueeze(2)
+        distance = torch.sqrt(torch.sum(torch.abs(points) ** 2, dim=1))
         distance = distance.max(dim=1)[0].unsqueeze(1).unsqueeze(1)
-        point_cloud = (point_cloud / distance)
-        point_cloud = (point_cloud + 1) / 2
-        return point_cloud.view(C, N)
+        points = (points / distance)
+        points = (points + 1) / 2
+        return points.view(C, N)
+        '''
+        B, C, N = points.size()
+        mean = points.mean(dim=2)
+        distance = torch.sqrt(torch.sum(torch.abs(points) ** 2, dim=1))
+        distance = distance.max(dim=1)[0].unsqueeze(1).unsqueeze(1)
+        points = normalize(mean, distance, points)
+        return points.view(C, N)
+        '''
+        centroid = np.mean(points, axis=0)
+        points -= centroid
+        furthest_distance = np.max(np.sqrt(np.sum(abs(points)**2,axis=-1)))
+        points /= 
+        '''
 
 class LINEMOD(Dataset):
     """
@@ -51,8 +78,10 @@ class LINEMOD(Dataset):
             self, 
             root_dir: Optional[str] = '../datasets/Linemod_preprocessed', 
             point_count: Optional[int] = 400, 
-            model_name: Optional[ModelName] = ModelName.DenseFusion
+            model_name: Optional[ModelName] = ModelName.DenseFusion,
+            modalities: Optional[Modality] = [ Modality.RGB ]
     ) -> None:
+        self.modalities = modalities
         self.model_name = model_name
         self.depths = []
         self.masks = []
@@ -65,12 +94,17 @@ class LINEMOD(Dataset):
         self.point_count = point_count # np.random.randint(100, 1000)
 
         self.image_transform = transforms.Compose([
-            transforms.Resize((224, 224)),
+            transforms.Resize((300, 224)),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
 
         self.cloud_transform = transforms.Compose([
+            transforms.ToTensor(),
+            NormalizePointCloud()
+        ])
+
+        self.corner_transform = transforms.Compose([
             transforms.ToTensor(),
             NormalizePointCloud()
         ])
@@ -154,6 +188,7 @@ class LINEMOD(Dataset):
         #image_[rmin:rmax, cmin:cmax] = image[rmin:rmax, cmin:cmax]
         #image_ = Image.fromarray(image)
         image_ = Image.fromarray(image[rmin:rmax, cmin:cmax])
+        #import pdb; pdb.set_trace()
 
         #import pdb; pdb.set_trace()
         
@@ -161,10 +196,17 @@ class LINEMOD(Dataset):
         corner_offsets = np.swapaxes(corner_offsets, 0, 2)
         corners = np.swapaxes(corners, 0, 1)
 
+        '''
+        mean = points.mean(axis=1)
+        distance = torch.sqrt(np.sum(np.abs(corners) ** 2))
+        distance = distance.max(dim=1)[0].unsqueeze(1).unsqueeze(1)
+        points = normalize(mean, distance, points)
+        '''
+
         if self.model_name is ModelName.GlobalFusion:
-            return id, self.image_transform(image_), self.cloud_transform(depth_cloud).to(torch.float), torch.from_numpy(corners)
+            return id, self.image_transform(image_), self.cloud_transform(depth_cloud).to(torch.float), self.corner_transform(corners)
         elif self.model_name is ModelName.DenseFusion:
-            return id, self.image_transform(image_), self.cloud_transform(depth_cloud).to(torch.float), torch.from_numpy(corner_offsets)
+            return id, self.image_transform(image_), self.cloud_transform(depth_cloud).to(torch.float), self.corner_transform(corner_offsets)
 
     def __len__(self) -> int:
         return len(self.ids)

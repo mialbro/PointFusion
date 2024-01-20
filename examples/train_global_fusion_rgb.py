@@ -8,8 +8,8 @@ def main():
     model_name = pointfusion.ModelName.GlobalFusion
     modalities = [ pointfusion.Modality.RGB ]
 
-    model = pointfusion.GlobalFusion(point_count=400, modalities=modalities)
-    dataset = pointfusion.LINEMOD(point_count=400, model_name=model_name)
+    model = pointfusion.GlobalFusion(modalities=modalities)
+    dataset = pointfusion.LINEMOD(model_name=model_name, modalities=modalities)
     loss_fcn = pointfusion.loss.global_fusion
 
     trainer = pointfusion.Trainer()

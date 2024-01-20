@@ -17,8 +17,9 @@ class Trainer:
         loss_fcn (lambda): Loss function
     """
     def __init__(self) -> None:
+        self.init_loss = None
         # hyperparameters
-        self.lr = 0.01
+        self.lr = 0.1
         self.epochs = 20
         self.weight_decay = 0.1
         self.batch_size = 10
@@ -84,7 +85,9 @@ class Trainer:
                 # forward
                 output = self._model(image, cloud)
                 loss = self.loss_fcn(output, corners)
-                print(f'EPOCH {epoch} / {self.epochs} | BATCH : {batch_idx} / {len(self._train_loader)} | LOSS : {loss}')
+                if self.init_loss is None:
+                    self.init_loss = loss.item()
+                print(f'EPOCH {epoch} / {self.epochs} | BATCH : {batch_idx} / {len(self._train_loader)} | LOSS : {loss}  | DL : {self.init_loss-loss.item()}')
 
                 optimizer.zero_grad()
                 loss.backward()
