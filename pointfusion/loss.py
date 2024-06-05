@@ -10,8 +10,7 @@ def global_fusion(input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         Loss
     """
     mse_loss = torch.nn.MSELoss()
-    output = mse_loss(input, target)
-    return output
+    return mse_loss(input, target)
 
 def dense_fusion(input: torch.Tensor, target, w: float = 0.1, eps: float = 1e-16) -> torch.Tensor:
     """

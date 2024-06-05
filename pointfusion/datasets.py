@@ -101,12 +101,12 @@ class LINEMOD(Dataset):
 
         self.cloud_transform = transforms.Compose([
             transforms.ToTensor(),
-            NormalizePointCloud()
+            #NormalizePointCloud()
         ])
 
         self.corner_transform = transforms.Compose([
             transforms.ToTensor(),
-            NormalizePointCloud()
+            #NormalizePointCloud()
         ])
 
         for i, path in enumerate(sorted(glob.glob(os.path.join(root_dir, 'data', '*')))):
@@ -148,29 +148,32 @@ class LINEMOD(Dataset):
         depth = np.array(Image.open(self.depths[index]))
         mask = np.array(Image.open(self.masks[index]))
         image = np.array(Image.open(self.images[index])) # load the mask
-        model = np.asarray(o3d.io.read_point_cloud(self.models[index]).points)
-        
-        camera = Camera(camera_matrix=self.intrinsics[index], rotation=self.rvecs[index], translation=self.tvecs[index])
-        model = camera.transform(model)
-
         image = np.where(mask, image, np.nan).astype(image.dtype)
         depth = np.where(mask[:, :, 0], depth, np.nan).astype(depth.dtype)
-
+        # Load model corners
+        camera = Camera(camera_matrix=self.intrinsics[index], rotation=self.rvecs[index], translation=self.tvecs[index])
+        model = np.asarray(o3d.io.read_point_cloud(self.models[index]).points)
+        model = camera.transform(model)
+        model[:, 0] = (model[:, 0] - np.min(model[:, 0])) / (np.max(model[:, 0]) - np.min(model[:, 0]))
+        model[:, 1] = (model[:, 1] - np.min(model[:, 1])) / (np.max(model[:, 1]) - np.min(model[:, 1]))
+        model[:, 2] = (model[:, 2] - np.min(model[:, 2])) / (np.max(model[:, 2]) - np.min(model[:, 2]))
+        corners = utils.get_corners(model)
+        '''
         depth_cloud, colors = camera.back_project(depth, image)
         corners = utils.get_corners(model)
         xx = ([self.model_info[id]['min_x'], self.model_info[id]['min_x'] + self.model_info[id]['size_x']])
         yy = ([self.model_info[id]['min_y'], self.model_info[id]['min_y'] + self.model_info[id]['size_y']])
         zz = ([self.model_info[id]['min_z'], self.model_info[id]['min_z'] + self.model_info[id]['size_z']])
-
         cc = []
         for x in xx:
             for y in yy:
                 for z in zz:
                     cc.append([x, y, z])
         cc = np.asarray(cc)
-
         corners = camera.transform(cc)
-        
+        corner_offsets = utils.get_corner_offsets(depth_cloud, corners)
+        '''
+        depth_cloud, colors = camera.back_project(depth, image)
         corner_offsets = utils.get_corner_offsets(depth_cloud, corners)
         if depth_cloud.shape[0] > self.point_count:
             sample = np.random.choice(depth_cloud.shape[0], self.point_count, replace=False)
@@ -202,9 +205,8 @@ class LINEMOD(Dataset):
         distance = distance.max(dim=1)[0].unsqueeze(1).unsqueeze(1)
         points = normalize(mean, distance, points)
         '''
-
         if self.model_name is ModelName.GlobalFusion:
-            return id, self.image_transform(image_), self.cloud_transform(depth_cloud).to(torch.float), self.corner_transform(corners)
+            return id, self.image_transform(image_), self.cloud_transform(depth_cloud).to(torch.float).squeeze(0), self.corner_transform(corners)
         elif self.model_name is ModelName.DenseFusion:
             return id, self.image_transform(image_), self.cloud_transform(depth_cloud).to(torch.float), self.corner_transform(corner_offsets)
 

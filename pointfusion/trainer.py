@@ -1,9 +1,13 @@
 import torch
 import open3d as o3d
 import numpy as np
+from typing import Optional
+import argparse
 
-import pointfusion.loss as LOSS
-from pointfusion.datasets import LINEMOD
+from loss import dense_fusion
+from models import DenseFusion, GlobalFusion
+from datasets import LINEMOD
+from enums import Modality, ModelName
 
 class Trainer:
     """
@@ -25,6 +29,7 @@ class Trainer:
         self.batch_size = 10
         self.modalities = []
         self.loss_fcn = None
+        self.weight_path = None
         self._dataset = None
         self._test_set = None
         self._train_set = None
@@ -64,10 +69,19 @@ class Trainer:
         self._train_loader = torch.utils.data.DataLoader(dataset=self._train_set, batch_size=self.batch_size, shuffle=True)
         self._val_loader = torch.utils.data.DataLoader(dataset=self._test_set, batch_size=self.batch_size, shuffle=True)
 
+    def save(self, path: Optional[str] = None) -> None:
+        """Save model to file
+        Args:
+            path (str): Path to write to
+        Returns:
+            None
+        """
+        if path is None:
+            path = self.weight_path
+        torch.save(self.model.state_dict(), path)
+
     def fit(self) -> None:
-        """
-        Runs optimization
-        """
+        """Runs optimization"""
         # loss and optimizer
         optimizer = torch.optim.Adam(self._model.parameters(), lr=self.lr)
         self.model.train()
@@ -81,13 +95,12 @@ class Trainer:
                 cloud = cloud.to(self._device)
                 image = image.to(self._device)
                 corners = corners.to(self._device).float()
-
                 # forward
                 output = self._model(image, cloud)
                 loss = self.loss_fcn(output, corners)
                 if self.init_loss is None:
                     self.init_loss = loss.item()
-                print(f'EPOCH {epoch} / {self.epochs} | BATCH : {batch_idx} / {len(self._train_loader)} | LOSS : {loss}  | DL : {self.init_loss-loss.item()}')
+                print(f'EPOCH {epoch} / {self.epochs} | BATCH : {batch_idx} / {len(self._train_loader)} | LOSS : {loss}  | DELTA : {self.init_loss-loss.item()}')
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -103,7 +116,42 @@ class Trainer:
                     output = self._model(image, cloud)
                     loss = self.loss_fcn(output, corners)
                     print(f'VALIDATION EPOCH {epoch} / {self.epochs} | BATCH : {batch_idx} / {len(self._train_loader)} | LOSS : {loss}')
-
             stats['epoch_loss'].append(running_loss / len(self._train_loader))
             stats['train_loss'].append(loss.item())
             print(f'EPOCH LOSS " {stats["epoch_loss"][-1]}')
+
+def main() -> None:
+    """Run training loop"""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--model',
+        type=ModelName,
+        choices=list(ModelName),
+        default=ModelName.DenseFusion
+    )
+    parser.add_argument(
+        '--modality',
+        type=Modality,
+        choices=list(Modality),
+        nargs='+',
+        default=[Modality.POINT_CLOUD]
+    )
+    parser.add_argument('--batch_size', type=int, default=5)
+    parser.add_argument('--lr', type=float, default=0.001)
+    parser.add_argument('--weight_decay', type=float, default=0.001)
+    parser.add_argument()
+
+    args = parser.parse_args()
+    # Load model
+    dataset = LINEMOD(point_count=400, model_name=args.modality)
+    trainer = Trainer()
+    trainer.batch_size = args.batch_size
+    trainer.lr = args.lr
+    trainer.weight_decay = args.weight_decay
+    trainer.model = DenseFusion(point_count=400, modalities=args.model)
+    trainer.loss_fcn = args.loss_fcn
+    trainer.dataset = dataset
+    trainer.fit()
+
+if __name__ == '__main__':
+    main()

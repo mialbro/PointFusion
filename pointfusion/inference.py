@@ -6,7 +6,6 @@ import torchvision
 import numpy as np
 
 import pointfusion
-from pointfusion.d455 import D455
 from pointfusion.models import GlobalFusion, DenseFusion
 
 class Inference:
@@ -51,10 +50,3 @@ class Inference:
                     scores.append(curr_scores)
                     curr_corners.append(curr_corners)
         return scores, corners
-
-if __name__ == '__main__':
-    camera = D455()
-    inference = Inference('../weights/pointfusion_0.pt')
-
-    for (color, depth, point_cloud) in camera:
-        scores, corners = inference.predict(color, depth)

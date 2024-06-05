@@ -37,13 +37,15 @@ class ResNet(nn.Module):
         Args:
             x (torch.Tensor): Input image
         Returns:
-            Extracted image features"""
+            Extracted image features
+        """
         B = x.size(0)
         x = self.features(x)
         x = x.view(B, -1, 1)
         x = self.relu(self.conv1(x))
         x = self.relu(self.conv2(x))
         x = x.squeeze(2)
+        x = self.relu(x)
         return x
 
     def channels(self) -> tuple:
@@ -357,6 +359,7 @@ class GlobalFusion(nn.Module):
         self.modalities = modalities
         self.image_encoder = ResNet(output_features=2048)
         self.point_encoder = PointNetBackbone(num_points=point_count)
+        self.relu = torch.nn.ReLU()
 
         input_fusion_size = 0
         if pointfusion.Modality.RGB in modalities:
@@ -368,7 +371,7 @@ class GlobalFusion(nn.Module):
         channels = np.linspace(input_fusion_size, 24, num=10, dtype=int)
         for i, channel in enumerate(channels):
             if (i + 1) < len(channels):
-                layers.append(torch.nn.ReLU())
+                layers.append(self.relu)
                 layers.append(nn.Conv1d(channel, channels[i+1], 1))
 
         self.model = torch.nn.Sequential(*layers)
@@ -382,11 +385,9 @@ class GlobalFusion(nn.Module):
             8 corners of 3D bounding box
         """
         B, D, N = point_cloud.size() if point_cloud is not None else image.size()
-
         features = None
         point_features = None
         image_features = None
-
         # Extract point-wise (n x 64) and global (1 x 1024) features from point cloud
         if pointfusion.Modality.POINT_CLOUD in self.modalities:
             if point_cloud is None:
@@ -409,7 +410,6 @@ class GlobalFusion(nn.Module):
         
         features = self.model(features)
         features = features.view(B, 3, 8)
-        
         return features
     
 
@@ -424,7 +424,7 @@ class DenseFusion(nn.Module):
         point_encoder (nn.Module): Network that extracts point cloud features
         model (torch.nn.Sequential): Global fusion model
         """
-    def __init__(self, point_count: Optional[int] = 100, modalities: Optional[List[pointfusion.Modality]] = [pointfusion.Modality.RGB]):
+    def init__(self, point_count: Optional[int] = 100, modalities: Optional[List[pointfusion.Modality]] = [pointfusion.Modality.RGB]):
         super(DenseFusion, self).__init__()
         self.modalities = modalities
         self.image_encoder = ResNet(output_features=2048)

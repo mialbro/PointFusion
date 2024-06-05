@@ -37,14 +37,17 @@ def bbox_from_mask(mask):
     cmin, cmax = np.where(cols)[0][[0, -1]]
     return rmin, rmax, cmin, cmax
 
-def get_corners(points=None):
-    """get the corners from the transformed pointcloud"""
+def get_corners(points: np.ndarray):
+    """get the corners from the transformed pointcloud
+    Args:
+        points (np.ndarray)
+    Returns:
+    """
     if isinstance(points, np.ndarray):
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(points)
     elif isinstance(points, o3d.geometry.PointCloud):
         pcd = points
-
     obb = o3d.geometry.OrientedBoundingBox()
     obb = obb.create_from_points(pcd.points)
     corners = np.asarray(obb.get_box_points())

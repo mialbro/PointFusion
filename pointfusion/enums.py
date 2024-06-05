@@ -5,10 +5,26 @@ class Mode(Enum):
     EVAL = 2
     PREDICT = 3
 
+    def __str__(self):
+        return self.name
+
 class Modality(Enum):
     RGB = 1
-    POINT_CLOUD = 2
+    POINTCLOUD = 2
+
+    def __str__(self):
+        return self.name
 
 class ModelName(Enum):
     GlobalFusion = 1
     DenseFusion = 2
+
+    def __str__(self):
+        return self.name
+    
+class LossFcn(Enum):
+    GlobalFusion = 1
+    DenseFusion = 2
+
+    def __str__(self):
+        return self.name
