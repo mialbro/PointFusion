@@ -18,6 +18,7 @@ dependencies:
   - conda-forge::librealsense
   - conda-forge::openmp
   - conda-forge::openblas
+  - conda-forge::libudev
   - pip
   - pip:
     - torchsummary

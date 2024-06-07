@@ -22,6 +22,10 @@ cd PointFusion/datasets
 ```
 * Download https://drive.google.com/file/d/11YzXNEyeQY7DcNZZZ6SVn732_EqMSopv/view?usp=sharing
 
+## Usage
+```python
+python3 trainer --model {} --modality {}
+```
 ## Training
 ```python
 import pointfusion

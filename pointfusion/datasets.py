@@ -8,12 +8,10 @@ import open3d as o3d
 from PIL import Image
 from torchvision import transforms
 from torch.utils.data import Dataset
-
 from typing import Optional
-
-import pointfusion.utils as utils
-from pointfusion.camera import Camera
-from pointfusion.enums import ModelName, Modality
+import utils as utils
+from camera import Camera
+from enums import ModelName, Modality
 
 def normalize(mean, distance, points):
     points = points - mean

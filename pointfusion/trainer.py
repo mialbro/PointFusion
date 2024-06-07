@@ -61,7 +61,7 @@ class Trainer:
         Gets pointfusion dataset
         """
         return self._dataset
-    
+
     @dataset.setter
     def dataset(self, dataset: torch.utils.data.Dataset) -> None:
         self._dataset = dataset
@@ -85,12 +85,11 @@ class Trainer:
         # loss and optimizer
         optimizer = torch.optim.Adam(self._model.parameters(), lr=self.lr)
         self.model.train()
-
         stats = {'train_loss': [], 'validation_loss': [], 'epoch_loss': []}
         for epoch in range(self.epochs):
             # Training
             running_loss = 0.0
-            for batch_idx, (id, image, cloud, corners) in enumerate(self._train_loader):
+            for batch_idx, (_, image, cloud, corners) in enumerate(self._train_loader):
                 # output from database
                 cloud = cloud.to(self._device)
                 image = image.to(self._device)
@@ -101,13 +100,10 @@ class Trainer:
                 if self.init_loss is None:
                     self.init_loss = loss.item()
                 print(f'EPOCH {epoch} / {self.epochs} | BATCH : {batch_idx} / {len(self._train_loader)} | LOSS : {loss}  | DELTA : {self.init_loss-loss.item()}')
-
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-
                 running_loss += loss.item()
-
             with torch.no_grad():
                 for batch_idx, (id, image, cloud, corners) in enumerate(self._val_loader):
                     cloud = cloud.to(self._device)
@@ -134,13 +130,11 @@ def main() -> None:
         type=Modality,
         choices=list(Modality),
         nargs='+',
-        default=[Modality.POINT_CLOUD]
+        default=[Modality.POINTCLOUD]
     )
     parser.add_argument('--batch_size', type=int, default=5)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--weight_decay', type=float, default=0.001)
-    parser.add_argument()
-
     args = parser.parse_args()
     # Load model
     dataset = LINEMOD(point_count=400, model_name=args.modality)
@@ -148,7 +142,7 @@ def main() -> None:
     trainer.batch_size = args.batch_size
     trainer.lr = args.lr
     trainer.weight_decay = args.weight_decay
-    trainer.model = DenseFusion(point_count=400, modalities=args.model)
+    trainer.model = DenseFusion(point_count=400, modalities=args.modality)
     trainer.loss_fcn = args.loss_fcn
     trainer.dataset = dataset
     trainer.fit()

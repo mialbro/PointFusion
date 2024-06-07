@@ -1,6 +1,5 @@
 import numpy as np
 import open3d as o3d
-
 import torch
 import torch.nn as nn
 import torch.utils.data
@@ -8,10 +7,8 @@ import torch.nn.parallel
 from torchvision import models
 import torch.nn.functional as F
 from torch.autograd import Variable
-
 from typing import Optional, List, Tuple
-
-import pointfusion
+from enums import Modality
 
 class ResNet(nn.Module):
     """ResNet wrapper model
@@ -29,7 +26,7 @@ class ResNet(nn.Module):
         self.relu = nn.ReLU()
         self.conv1 = nn.Conv1d(2048, 3048, 1)
         self.conv2 = nn.Conv1d(3048, output_features, 1)
-        self.model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+        self.model = models.resnet50(pretrained=True) # (weights=models.ResNet50_Weights.DEFAULT)
         self.features = nn.Sequential(*list(self.model.children())[:-1])
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -354,17 +351,17 @@ class GlobalFusion(nn.Module):
         point_encoder (nn.Module): Network that extracts point cloud features
         model (torch.nn.Sequential): Global fusion model
         """
-    def __init__(self, point_count: Optional[int] = 100, modalities: Optional[List[pointfusion.Modality]] = [pointfusion.Modality.RGB]):
+    def __init__(self, point_count: Optional[int] = 100, modalities: Optional[List[Modality]] = None):
         super(GlobalFusion, self).__init__()
-        self.modalities = modalities
+        self.modalities = [Modality.RGB] if modalities is None else modalities
         self.image_encoder = ResNet(output_features=2048)
         self.point_encoder = PointNetBackbone(num_points=point_count)
         self.relu = torch.nn.ReLU()
 
         input_fusion_size = 0
-        if pointfusion.Modality.RGB in modalities:
+        if Modality.RGB in modalities:
             input_fusion_size += self.image_encoder.channels()
-        if pointfusion.Modality.POINT_CLOUD in modalities:
+        if Modality.POINT_CLOUD in modalities:
             input_fusion_size += self.point_encoder.channels()[0]
 
         layers = []
@@ -376,7 +373,11 @@ class GlobalFusion(nn.Module):
 
         self.model = torch.nn.Sequential(*layers)
 
-    def forward(self, image: Optional[torch.Tensor] = None, point_cloud: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(
+            self,
+            image: Optional[torch.Tensor] = None,
+            point_cloud: Optional[torch.Tensor] = None
+        ) -> torch.Tensor:
         """Process images and / or point clouds
         Args:
             image (torch.Tensor): Input image
@@ -389,29 +390,26 @@ class GlobalFusion(nn.Module):
         point_features = None
         image_features = None
         # Extract point-wise (n x 64) and global (1 x 1024) features from point cloud
-        if pointfusion.Modality.POINT_CLOUD in self.modalities:
+        if Modality.POINT_CLOUD in self.modalities:
             if point_cloud is None:
                 raise Exception("Must supply Point Cloud...")
             point_features, _ = self.point_encoder(point_cloud)
         
         # Extract image features
-        if pointfusion.Modality.RGB in self.modalities:
+        if Modality.RGB in self.modalities:
             if image is None:
                 raise Exception("Must supply image")
             image_features = self.image_encoder(image)
-
         # Fuse features
         if len(self.modalities) == 2:
             features = torch.concatenate([image_features, point_features], axis=1).unsqueeze(2)
-        elif pointfusion.Modality.RGB in self.modalities:
+        elif Modality.RGB in self.modalities:
             features = image_features.unsqueeze(2)
-        elif pointfusion.Modality.POINT_CLOUD in self.modalities:
-            features = point_features.unsqueeze(2)
-        
+        elif Modality.POINT_CLOUD in self.modalities:
+            features = point_features.unsqueeze(2)  
         features = self.model(features)
         features = features.view(B, 3, 8)
         return features
-    
 
 class DenseFusion(nn.Module):
     """Dense Fusion model which ingests images and/or point clouds and directly regresses the 8 corners of the 3D bounding box
@@ -424,27 +422,28 @@ class DenseFusion(nn.Module):
         point_encoder (nn.Module): Network that extracts point cloud features
         model (torch.nn.Sequential): Global fusion model
         """
-    def init__(self, point_count: Optional[int] = 100, modalities: Optional[List[pointfusion.Modality]] = [pointfusion.Modality.RGB]):
-        super(DenseFusion, self).__init__()
-        self.modalities = modalities
+    def __init__(
+            self,
+            point_count: Optional[int] = 100,
+            modalities: Optional[List[Modality]] = None
+        ) -> None:
+        super().__init__()
+        self.modalities = [Modality.RGB] if modalities is None else modalities
+        import pdb; pdb.set_trace()
         self.image_encoder = ResNet(output_features=2048)
         self.point_encoder = PointNetBackbone(num_points=point_count)
-
         input_fusion_size = 0
-        if pointfusion.Modality.RGB in modalities:
+        if Modality.RGB in self.modalities:
             input_fusion_size += self.image_encoder.channels()
-        if pointfusion.Modality.POINT_CLOUD in modalities:
-            input_fusion_size += sum([ channel_count for channel_count in self.point_encoder.channels() ])
-        
+        if Modality.POINT_CLOUD in self.modalities:
+            input_fusion_size += sum(n for n in self.point_encoder.channels())
         layers = []
         channels = np.linspace(input_fusion_size, 128, num=10, dtype=int)
         for i, channel in enumerate(channels):
             if (i + 1) < len(channels):
                 layers.append(nn.Conv1d(channel, channels[i+1], 1))
                 layers.append(torch.nn.ReLU())
-
         self.backbone = torch.nn.Sequential(*layers)
-
         self.localization_head = torch.nn.Sequential(
             torch.nn.Linear(128, 64),
             torch.nn.ReLU(),
@@ -452,7 +451,6 @@ class DenseFusion(nn.Module):
             torch.nn.ReLU(),
             torch.nn.Linear(32, 24)
         )
-
         self.scoring_head = torch.nn.Sequential(
             torch.nn.Linear(128, 64),
             torch.nn.ReLU(),
@@ -462,10 +460,13 @@ class DenseFusion(nn.Module):
             torch.nn.ReLU(),
             torch.nn.Linear(16, 1),
         )
-
         self.soft_max = torch.nn.Softmax(dim=1)
 
-    def forward(self, image: Optional[torch.Tensor] = None, point_cloud: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(
+            self,
+            image: Optional[torch.Tensor] = None,
+            point_cloud: Optional[torch.Tensor] = None
+        ) -> torch.Tensor:
         """Process images and / or point clouds
         Args:
             image (torch.Tensor): Input image
@@ -475,45 +476,36 @@ class DenseFusion(nn.Module):
             N x 8 corner offsets of 3D bounding box
         """
         B, D, N = point_cloud.size() if point_cloud is not None else image.size()
-
         features = None
         point_features = None
         image_features = None
-
         # Extract point-wise (n x 64) and global (1 x 1024) features from point cloud
-        if pointfusion.Modality.POINT_CLOUD in self.modalities:
+        if Modality.POINT_CLOUD in self.modalities:
             if point_cloud is None:
                 raise Exception("Must supply Point Cloud...")
             global_features, point_wise_features = self.point_encoder(point_cloud)
             global_features = global_features.unsqueeze(2).repeat(1, 1, 400)
             point_features = torch.concatenate((global_features, point_wise_features), axis=1)
-
         # Extract image features
-        if pointfusion.Modality.RGB in self.modalities:
+        if Modality.RGB in self.modalities:
             if image is None:
                 raise Exception("Must supply image")
             image_features = self.image_encoder(image)
-
         # Fuse features
         if len(self.modalities) == 2:
             image_features = image_features.unsqueeze(2).repeat((1, 1, point_features.size()[-1]))
             features = torch.concatenate([image_features, point_features], axis=1)
-        elif pointfusion.Modality.RGB in self.modalities:
+        elif Modality.RGB in self.modalities:
             features = image_features.unsqueeze(2) 
-        elif pointfusion.Modality.POINT_CLOUD in self.modalities:
+        elif Modality.POINT_CLOUD in self.modalities:
             features = point_features.squeeze(2)
-
         features = self.backbone(features)
-
         corner_offsets = self.localization_head(features.swapaxes(1, 2))
         scores = self.scoring_head(features.swapaxes(1, 2))
-
         corner_offsets = corner_offsets.view(B, 3, 8, -1)
         scores = scores.squeeze(2)
-
         print((scores[0].min().item(), scores[1].max().item()))
         scores = self.soft_max(scores)
         print((scores[0].min().item(), scores[1].max().item()))
         print()
-
         return scores, corner_offsets

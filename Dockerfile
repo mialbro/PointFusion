@@ -50,7 +50,7 @@ RUN usermod -aG video ${USERNAME}
 USER ${USERNAME}
 
 RUN mkdir -p /home/${USERNAME}/pointfusion
-WORKDIR /home/${USERNAME}/pointfusion/examples
+WORKDIR /home/${USERNAME}/pointfusion
 
 RUN conda init bash
 RUN echo "conda activate pointfusion" >> ~/.bashrc
