@@ -8,7 +8,8 @@ from torchvision import models
 import torch.nn.functional as F
 from torch.autograd import Variable
 from typing import Optional, List, Tuple
-from enums import Modality
+
+from .enums import Modality
 
 class ResNet(nn.Module):
     """ResNet wrapper model

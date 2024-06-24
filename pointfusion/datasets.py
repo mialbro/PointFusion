@@ -1,7 +1,6 @@
 import os
 import glob
 import yaml
-import cv2
 import torch
 import numpy as np
 import open3d as o3d
@@ -9,9 +8,10 @@ from PIL import Image
 from torchvision import transforms
 from torch.utils.data import Dataset
 from typing import Optional
-import utils as utils
-from camera import Camera
-from enums import ModelName, Modality
+
+from .camera import Camera
+from .enums import ModelName, Modality
+from .utils import bbox_from_mask, get_corners, get_corner_offsets
 
 def normalize(mean, distance, points):
     points = points - mean
@@ -155,10 +155,10 @@ class LINEMOD(Dataset):
         model[:, 0] = (model[:, 0] - np.min(model[:, 0])) / (np.max(model[:, 0]) - np.min(model[:, 0]))
         model[:, 1] = (model[:, 1] - np.min(model[:, 1])) / (np.max(model[:, 1]) - np.min(model[:, 1]))
         model[:, 2] = (model[:, 2] - np.min(model[:, 2])) / (np.max(model[:, 2]) - np.min(model[:, 2]))
-        corners = utils.get_corners(model)
+        corners = get_corners(model)
         '''
         depth_cloud, colors = camera.back_project(depth, image)
-        corners = utils.get_corners(model)
+        corners = get_corners(model)
         xx = ([self.model_info[id]['min_x'], self.model_info[id]['min_x'] + self.model_info[id]['size_x']])
         yy = ([self.model_info[id]['min_y'], self.model_info[id]['min_y'] + self.model_info[id]['size_y']])
         zz = ([self.model_info[id]['min_z'], self.model_info[id]['min_z'] + self.model_info[id]['size_z']])
@@ -169,10 +169,10 @@ class LINEMOD(Dataset):
                     cc.append([x, y, z])
         cc = np.asarray(cc)
         corners = camera.transform(cc)
-        corner_offsets = utils.get_corner_offsets(depth_cloud, corners)
+        corner_offsets = get_corner_offsets(depth_cloud, corners)
         '''
-        depth_cloud, colors = camera.back_project(depth, image)
-        corner_offsets = utils.get_corner_offsets(depth_cloud, corners)
+        depth_cloud, _ = camera.back_project(depth, image)
+        corner_offsets = get_corner_offsets(depth_cloud, corners)
         if depth_cloud.shape[0] > self.point_count:
             sample = np.random.choice(depth_cloud.shape[0], self.point_count, replace=False)
         else:
@@ -182,7 +182,7 @@ class LINEMOD(Dataset):
         # sample depth point cloud
         depth_cloud = np.transpose(depth_cloud[sample])
         # crop image
-        rmin, rmax, cmin, cmax = utils.bbox_from_mask(mask)
+        rmin, rmax, cmin, cmax = bbox_from_mask(mask)
 
         #import pdb; pdb.set_trace()
         #image_ = np.zeros(image.shape, dtype=image.dtype)

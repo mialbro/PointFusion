@@ -51,7 +51,6 @@ class Camera:
             self._camera_matrix = np.asarray(camera_matrix).reshape((3, 3))
         self._dist_coeffs = np.asarray(dist_coeffs).reshape((5, 1))
         self._depth_scale = depth_scale
-
         # Extrinsics
         numel = len(rotation) if isinstance(rotation, list) else rotation.size
         if numel == 3:

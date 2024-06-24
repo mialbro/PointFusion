@@ -13,7 +13,6 @@ RUN apt update && \
         mlocate \
         libopenblas-base \
         libopenmpi-dev \
-        libudev-dev \
         pkg-config \
         libgtk-3-dev \
         v4l-utils \
@@ -28,6 +27,7 @@ RUN apt update && \
         libssl-dev \
         libusb-1.0-0-dev \
         libudev-dev \
+        libudev0 \
         pkg-config \
         libgtk-3-dev \
         mesa-utils \
@@ -41,6 +41,8 @@ RUN ./Mambaforge-$(uname)-$(uname -m).sh -b -p /opt/mamba
 
 ENV PATH /opt/mamba/bin:$PATH
 COPY environment.yml .
+RUN conda update conda
+RUN conda install mamba -n base -c conda-forge
 RUN mamba env create -f environment.yml
 
 ARG USERNAME
