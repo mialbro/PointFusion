@@ -20,7 +20,11 @@ class Trainer:
         modalities (list[pointfusion.Modality]): List of input modalities
         loss_fcn (lambda): Loss function
     """
-    def __init__(self) -> None:
+    def __init__(self,
+        point_count: int,
+        modality: Modality,
+        backbone: ModelName
+    ) -> None:
         self.init_loss = None
         # hyperparameters
         self.lr = 0.1
@@ -30,12 +34,20 @@ class Trainer:
         self.modalities = []
         self.loss_fcn = None
         self.weight_path = None
-        self._dataset = None
         self._test_set = None
         self._train_set = None
         self._train_loader = None
         self._val_loader = None
         self._device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # Set the model and loss function
+        if backbone is ModelName.DenseFusion:
+            self.model = DenseFusion(point_count=point_count, modalities=modality)
+            self.loss_fcn = dense_fusion
+        elif backbone is ModelName.GlobalFusion:
+            self.model = GlobalFusion(point_count=point_count, modalities=modality)
+            self.loss_fcn = global_fusion
+        # Set the dataset
+        self.dataset = LINEMOD(point_count=400, modalities=modality, model_name=backbone)
 
     def save_checkpoint(self, epoch: int) -> None:
         """
@@ -137,8 +149,8 @@ def main() -> None:
     parser.add_argument('--weight_decay', type=float, default=0.001)
     args = parser.parse_args()
     # Load model
-    dataset = LINEMOD(point_count=400, model_name=args.modality)
-    trainer = Trainer()
+    #dataset = LINEMOD(point_count=400, modalities=args.modality, model_name=args.model)
+    trainer = Trainer(point_count=400, modality=args.modality, model_name=args.model)
     trainer.batch_size = args.batch_size
     trainer.lr = args.lr
     trainer.weight_decay = args.weight_decay

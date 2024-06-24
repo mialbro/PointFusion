@@ -19,7 +19,6 @@ def normalize(mean, distance, points):
     return points
 
 def normalize_point_cloud(points: np.ndarray, mean: float, distance: float) -> np.ndarray:
-    
     points = points - mean.unsqueeze(2)
     distance = distance.max(dim=1)[0].unsqueeze(1).unsqueeze(1)
     points = (points / distance)
@@ -73,7 +72,7 @@ class LINEMOD(Dataset):
         model_name (Optional[pointfusion.ModelName]):
     """
     def __init__(
-            self, 
+            self,
             root_dir: Optional[str] = '../datasets/Linemod_preprocessed', 
             point_count: Optional[int] = 400, 
             model_name: Optional[ModelName] = ModelName.DenseFusion,
@@ -112,7 +111,6 @@ class LINEMOD(Dataset):
             depths = sorted(glob.glob(os.path.join(path, 'depth', '*.png')))
             masks = sorted(glob.glob(os.path.join(path, 'mask', '*.png')))
             images = sorted(glob.glob(os.path.join(path, 'rgb', '*.png')))
-
             n = min([len(depths), len(masks), len(images)])
             self.depths += depths[:n]
             self.masks += masks[:n]
@@ -120,12 +118,10 @@ class LINEMOD(Dataset):
             self.models += [f'{os.path.join(root_dir, "models", f"obj_{ids[0]:02d}.ply")}'] * n
             self.model_info = yaml.load(open(os.path.join(root_dir, 'models', 'models_info.yml')), Loader=yaml.FullLoader)
             self.ids += ids * n
-
-            with open(os.path.join(path, 'info.yml')) as f:
+            with open(os.path.join(path, 'info.yml'), 'r') as f:
                 info = yaml.load(f, Loader=yaml.FullLoader)
                 self.intrinsics += [ info[k]['cam_K'] for k in sorted(info.keys()) ][:n]
-
-            with open(os.path.join(path, 'gt.yml')) as f:
+            with open(os.path.join(path, 'gt.yml'), 'r') as f:
                 gt = yaml.load(f, Loader=yaml.FullLoader)
                 for k in sorted(gt.keys()):
                     for j in range(len(gt[k])):
@@ -146,8 +142,9 @@ class LINEMOD(Dataset):
         depth = np.array(Image.open(self.depths[index]))
         mask = np.array(Image.open(self.masks[index]))
         image = np.array(Image.open(self.images[index])) # load the mask
-        image = np.where(mask, image, np.nan).astype(image.dtype)
-        depth = np.where(mask[:, :, 0], depth, np.nan).astype(depth.dtype)
+        # Set resulting image to be NaN where mask is false
+        image = np.where(mask, image, 0).astype(image.dtype)
+        depth = np.where(mask[:, :, 0], depth, 0).astype(depth.dtype)
         # Load model corners
         camera = Camera(camera_matrix=self.intrinsics[index], rotation=self.rvecs[index], translation=self.tvecs[index])
         model = np.asarray(o3d.io.read_point_cloud(self.models[index]).points)
@@ -177,26 +174,21 @@ class LINEMOD(Dataset):
             sample = np.random.choice(depth_cloud.shape[0], self.point_count, replace=False)
         else:
             sample = np.random.choice(depth_cloud.shape[0], self.point_count, replace=True)
-        
         corner_offsets = corner_offsets[sample]
         # sample depth point cloud
         depth_cloud = np.transpose(depth_cloud[sample])
         # crop image
         rmin, rmax, cmin, cmax = bbox_from_mask(mask)
-
         #import pdb; pdb.set_trace()
         #image_ = np.zeros(image.shape, dtype=image.dtype)
         #image_[rmin:rmax, cmin:cmax] = image[rmin:rmax, cmin:cmax]
         #image_ = Image.fromarray(image)
         image_ = Image.fromarray(image[rmin:rmax, cmin:cmax])
         #import pdb; pdb.set_trace()
-
         #import pdb; pdb.set_trace()
-        
         # rearrange corner offset dimensions
         corner_offsets = np.swapaxes(corner_offsets, 0, 2)
         corners = np.swapaxes(corners, 0, 1)
-
         '''
         mean = points.mean(axis=1)
         distance = torch.sqrt(np.sum(np.abs(corners) ** 2))
@@ -207,6 +199,7 @@ class LINEMOD(Dataset):
             return id, self.image_transform(image_), self.cloud_transform(depth_cloud).to(torch.float).squeeze(0), self.corner_transform(corners)
         elif self.model_name is ModelName.DenseFusion:
             return id, self.image_transform(image_), self.cloud_transform(depth_cloud).to(torch.float), self.corner_transform(corner_offsets)
+        import pdb; pdb.set_trace()
 
     def __len__(self) -> int:
         return len(self.ids)
