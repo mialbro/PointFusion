@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from typing import Optional, List, Tuple
 
-from .enums import Modality
+from pointfusion.enums import Modality
 
 class ResNet(nn.Module):
     """ResNet wrapper model

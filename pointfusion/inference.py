@@ -1,23 +1,22 @@
 import open3d as o3d
-
 import cv2
 import torch
 import torchvision
 import numpy as np
 
-import pointfusion
+from pointfusion.enums import ModelName
 from pointfusion.models import GlobalFusion, DenseFusion
 
 class Inference:
-    def __init__(self, model_name: pointfusion.ModelName, filepath: str) -> None:   
+    def __init__(self, model_name: ModelName, filepath: str) -> None:   
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')     
         self.frcn = torchvision.models.detection.fasterrcnn_resnet50_fpn_v2(weights=torchvision.models.detection.FasterRCNN_ResNet50_FPN_V2_Weights.COCO_V1)
         self.frcn.eval()
         self.frcn.to(self.device)
 
-        if model_name is pointfusion.ModelName.DenseFusion:
+        if model_name is ModelName.DenseFusion:
             self.model = DenseFusion()
-        elif model_name is pointfusion.ModelName.GlobalFusion:
+        elif model_name is ModelName.GlobalFusion:
             self.model = GlobalFusion()
         
         self.model.load_state_dict(torch.load(filepath))

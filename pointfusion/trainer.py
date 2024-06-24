@@ -4,10 +4,10 @@ import numpy as np
 from typing import Optional
 import argparse
 
-from .loss import dense_fusion
-from .models import DenseFusion, GlobalFusion
-from .datasets import LINEMOD
-from .enums import Modality, ModelName
+from pointfusion.loss import dense_fusion
+from pointfusion.models import DenseFusion, GlobalFusion
+from pointfusion.datasets import LINEMOD
+from pointfusion.enums import Modality, ModelName
 
 class Trainer:
     """

@@ -9,9 +9,9 @@ from torchvision import transforms
 from torch.utils.data import Dataset
 from typing import Optional
 
-from .camera import Camera
-from .enums import ModelName, Modality
-from .utils import bbox_from_mask, get_corners, get_corner_offsets
+from pointfusion.camera import Camera
+from pointfusion.enums import ModelName, Modality
+from pointfusion.utils import bbox_from_mask, get_corners, get_corner_offsets
 
 def normalize(mean, distance, points):
     points = points - mean

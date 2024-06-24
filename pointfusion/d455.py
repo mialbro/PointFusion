@@ -2,7 +2,6 @@ import open3d as o3d
 
 import numpy as np
 import pyrealsense2 as rs
-
 from typing import Optional
 
 from pointfusion.camera import Camera
