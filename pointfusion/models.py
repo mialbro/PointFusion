@@ -27,7 +27,7 @@ class ResNet(nn.Module):
         self.relu = nn.ReLU()
         self.conv1 = nn.Conv1d(2048, 3048, 1)
         self.conv2 = nn.Conv1d(3048, output_features, 1)
-        self.model = models.resnet50(pretrained=True) # (weights=models.ResNet50_Weights.DEFAULT)
+        self.model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
         self.features = nn.Sequential(*list(self.model.children())[:-1])
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -430,13 +430,12 @@ class DenseFusion(nn.Module):
         ) -> None:
         super().__init__()
         self.modalities = [Modality.RGB] if modalities is None else modalities
-        import pdb; pdb.set_trace()
         self.image_encoder = ResNet(output_features=2048)
         self.point_encoder = PointNetBackbone(num_points=point_count)
         input_fusion_size = 0
         if Modality.RGB in self.modalities:
             input_fusion_size += self.image_encoder.channels()
-        if Modality.POINT_CLOUD in self.modalities:
+        if Modality.POINTCLOUD in self.modalities:
             input_fusion_size += sum(n for n in self.point_encoder.channels())
         layers = []
         channels = np.linspace(input_fusion_size, 128, num=10, dtype=int)

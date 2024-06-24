@@ -4,7 +4,7 @@ import numpy as np
 from typing import Optional
 import argparse
 
-from pointfusion.loss import dense_fusion
+from pointfusion.loss import dense_fusion, global_fusion
 from pointfusion.models import DenseFusion, GlobalFusion
 from pointfusion.datasets import LINEMOD
 from pointfusion.enums import Modality, ModelName
@@ -142,8 +142,13 @@ def main() -> None:
     trainer.batch_size = args.batch_size
     trainer.lr = args.lr
     trainer.weight_decay = args.weight_decay
-    trainer.model = DenseFusion(point_count=400, modalities=args.modality)
-    trainer.loss_fcn = args.loss_fcn
+    # Set the model and loss fcn
+    if args.model is ModelName.DenseFusion:
+        trainer.model = DenseFusion(point_count=400, modalities=args.modality)
+        trainer.loss_fcn = dense_fusion
+    else:
+        trainer.model = GlobalFusion(point_count=400, modalities=args.modality)
+        trainer.loss_fcn = global_fusion
     trainer.dataset = dataset
     trainer.fit()
 
