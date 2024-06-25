@@ -413,7 +413,8 @@ class GlobalFusion(nn.Module):
         return features
 
 class DenseFusion(nn.Module):
-    """Dense Fusion model which ingests images and/or point clouds and directly regresses the 8 corners of the 3D bounding box
+    """Dense Fusion model which ingests images and/or point clouds and directly 
+    regresses the 8 corners of the 3D bounding box
     Args:
         num_points (Optional[int]): Number of points in point cloud
         modalities (Optional[pointfusion.Modality]): Input data modalities
@@ -520,7 +521,13 @@ class DenseFusion(nn.Module):
             # Multi-modal features
             elif self.modality is Modality.RGB_POINTCLOUD:
                 image_features = self.image_encoder(image)
-                image_features = image_features.unsqueeze(2).repeat((1, 1, point_features.size()[-1]))
+                image_features = image_features.unsqueeze(2).repeat(
+                    (
+                        1,
+                        1,
+                        point_features.size()[-1]
+                    )
+                )
                 features = torch.concatenate(
                     [
                         image_features,
@@ -529,15 +536,15 @@ class DenseFusion(nn.Module):
                     axis=1
                 )
         # Post-process features
-        import pdb; pdb.set_trace()
         features = self.backbone(features)
         corner_offsets = self.localization_head(features.swapaxes(1, 2))
         scores = self.scoring_head(features.swapaxes(1, 2))
-        corner_offsets = corner_offsets.view(B, 3, 8, -1)
+        corner_offsets = corner_offsets.view(B, -1, 3, 8)
         scores = scores.squeeze(2)
         print((scores[0].min().item(), scores[1].max().item()))
         scores = self.soft_max(scores)
         print((scores[0].min().item(), scores[1].max().item()))
         print()
+
         return scores, corner_offsets
     

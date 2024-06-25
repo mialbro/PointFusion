@@ -1,37 +1,43 @@
+from typing import Optional, Tuple
+
 import torch
 
-def global_fusion(input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-    """
-    Returns error between predicted corners and ground-truth corners
+def global_fusion(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    """Gets error between predicted corners and ground-truth corners
     Args:
-        input (torch.Tensor): predicted corners
-        target (torch.Tensor): Ground truth corners
+        x (torch.Tensor): predicted corners
+        y (torch.Tensor): Ground truth corners
     Returns:
         Loss
     """
     mse_loss = torch.nn.MSELoss()
-    return mse_loss(input, target)
+    return mse_loss(x, y)
 
-def dense_fusion(input: torch.Tensor, target, w: float = 0.1, eps: float = 1e-16) -> torch.Tensor:
-    """
-    Returns error between predicted corners and ground-truth corners
+def dense_fusion(
+        x: Tuple[torch.Tensor],
+        y: torch.Tensor,
+        w: Optional[float] = 0.1,
+        eps: Optional[float] = 1e-16
+    ) -> torch.Tensor:
+    """Gets error between predicted corners and ground-truth corners
     Args:
-        input (list[torch.Tensor]): confidence scores, predicted corners
-        target (torch.Tensor): Ground truth corners
+        x (Tuple[torch.Tensor]): confidence scores, predicted corners
+        y (torch.Tensor): Ground truth corners
         w (Optional[float]): Scale of how much to weigh high confidence scores
         eps (Optional[float]): Epsilon for torch.log
     Returns:
         Loss
     """
-    scores = input[0]
-    corners = input[1]
+    import pdb; pdb.set_trace()
+    scores = x[0]
+    corners = x[1]
     L1 = torch.nn.SmoothL1Loss(reduction='none')
-    loss = L1(corners, target).sum(dim=(1, 2))
+    loss = L1(corners, y).sum(dim=(1, 2))
     #loss = (loss * scores) - (w * torch.log(scores + eps)) # as log approaches zero it grows negatively
     loss = loss.mean()
     #import pdb; pdb.set_trace()
     print(f'LOSS : {loss}')
     #print(corners)
-    #print(target)
+    #print(y)
     #print()
     return loss

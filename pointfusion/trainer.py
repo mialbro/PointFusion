@@ -144,7 +144,7 @@ def main() -> None:
         type=Modality,
         choices=list(Modality),
         nargs='+',
-        default=[Modality.POINTCLOUD]
+        default=Modality.POINTCLOUD
     )
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--batch_size', type=int, default=5)
