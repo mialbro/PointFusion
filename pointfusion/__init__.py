@@ -1,4 +1,4 @@
-from pointfusion.enums import Modality, ModelName
+from pointfusion.enums import Modality, FusionMethod
 from pointfusion.camera import Camera
 from pointfusion.d455 import D455
 from pointfusion.datasets import LINEMOD

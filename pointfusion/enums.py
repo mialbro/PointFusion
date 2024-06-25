@@ -11,20 +11,19 @@ class Mode(Enum):
 class Modality(Enum):
     RGB = 1
     POINTCLOUD = 2
+    RGB_POINTCLOUD = 3
 
     def __str__(self):
         return self.name
 
-class ModelName(Enum):
-    GlobalFusion = 1
-    DenseFusion = 2
+class FusionMethod(Enum):
+    """Enumerator for fusion strategy"""
+    GLOBAL = 1
+    DENSE = 2
 
-    def __str__(self):
-        return self.name
-    
-class LossFcn(Enum):
-    GlobalFusion = 1
-    DenseFusion = 2
-
-    def __str__(self):
+    def __str__(self) -> str:
+        """Get fusion method name
+        Returns:
+            Fusion name
+        """
         return self.name

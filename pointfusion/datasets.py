@@ -10,7 +10,7 @@ from torch.utils.data import Dataset
 from typing import Optional
 
 from pointfusion.camera import Camera
-from pointfusion.enums import ModelName, Modality
+from pointfusion.enums import FusionMethod, Modality
 from pointfusion.utils import bbox_from_mask, get_corners, get_corner_offsets
 
 def normalize(mean, distance, points):
@@ -54,7 +54,7 @@ class LINEMOD(Dataset):
     """
     LINEMOD dataset reader
     Attributes:
-        model_name (pointfusion.ModalityName): Name of pointfusion model used
+        fusion_method (pointfusion.FusionMethod): Name of pointfusion model used
         depths (list): List of depth images
         masks (list): 
         images (list):
@@ -63,23 +63,23 @@ class LINEMOD(Dataset):
         intrinsics (list): 
         models (list):
         ids (list):
-        point_count (int):
+        num_points (int):
         image_transform (torchvision.transforms):
         cloud_transform (torchvision.transforms):
     Args:
         root_dir (Optional[str]): Data directory
-        point_count (Optional[int]):
-        model_name (Optional[pointfusion.ModelName]):
+        num_points (Optional[int]):
+        fusion_method (Optional[pointfusion.FusionMethod]):
     """
     def __init__(
             self,
-            root_dir: Optional[str] = '../datasets/Linemod_preprocessed', 
-            point_count: Optional[int] = 400, 
-            model_name: Optional[ModelName] = ModelName.DenseFusion,
-            modalities: Optional[Modality] = [ Modality.RGB ]
+            root_dir: Optional[str] = '../datasets/Linemod_preprocessed',
+            num_points: Optional[int] = 400,
+            fusion_method: Optional[FusionMethod] = FusionMethod.DENSE,
+            modality: Optional[Modality] = Modality.RGB
     ) -> None:
-        self.modalities = modalities
-        self.model_name = model_name
+        self.modality = modality
+        self.fusion_method = fusion_method
         self.depths = []
         self.masks = []
         self.images = []
@@ -88,7 +88,7 @@ class LINEMOD(Dataset):
         self.intrinsics = []
         self.models = []
         self.ids = []
-        self.point_count = point_count # np.random.randint(100, 1000)
+        self.num_points = num_points # np.random.randint(100, 1000)
 
         self.image_transform = transforms.Compose([
             transforms.Resize((300, 224)),
@@ -170,10 +170,10 @@ class LINEMOD(Dataset):
         '''
         depth_cloud, _ = camera.back_project(depth, image)
         corner_offsets = get_corner_offsets(depth_cloud, corners)
-        if depth_cloud.shape[0] > self.point_count:
-            sample = np.random.choice(depth_cloud.shape[0], self.point_count, replace=False)
+        if depth_cloud.shape[0] > self.num_points:
+            sample = np.random.choice(depth_cloud.shape[0], self.num_points, replace=False)
         else:
-            sample = np.random.choice(depth_cloud.shape[0], self.point_count, replace=True)
+            sample = np.random.choice(depth_cloud.shape[0], self.num_points, replace=True)
         corner_offsets = corner_offsets[sample]
         # sample depth point cloud
         depth_cloud = np.transpose(depth_cloud[sample])
@@ -195,11 +195,18 @@ class LINEMOD(Dataset):
         distance = distance.max(dim=1)[0].unsqueeze(1).unsqueeze(1)
         points = normalize(mean, distance, points)
         '''
-        if self.model_name is ModelName.GlobalFusion:
-            return id, self.image_transform(image_), self.cloud_transform(depth_cloud).to(torch.float).squeeze(0), self.corner_transform(corners)
-        elif self.model_name is ModelName.DenseFusion:
-            return id, self.image_transform(image_), self.cloud_transform(depth_cloud).to(torch.float), self.corner_transform(corner_offsets)
-        import pdb; pdb.set_trace()
+        if self.fusion_method is FusionMethod.GLOBAL:
+            image = self.image_transform(image_)
+            points = self.cloud_transform(depth_cloud).to(torch.float).squeeze(0)
+            corners = self.corner_transform(corners)
+            return id, image, points, corners
+        elif self.fusion_method is FusionMethod.DENSE:
+            image = self.image_transform(image_)
+            points = self.cloud_transform(depth_cloud).to(torch.float).squeeze(0)
+            corners = self.corner_transform(corner_offsets)
+            return id, image, points, corners
+        else:
+            raise TypeError(f'Invalid Fusion Method {self.fusion_method}')
 
     def __len__(self) -> int:
         return len(self.ids)

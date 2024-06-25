@@ -7,7 +7,7 @@ import argparse
 from pointfusion.loss import dense_fusion, global_fusion
 from pointfusion.models import DenseFusion, GlobalFusion
 from pointfusion.datasets import LINEMOD
-from pointfusion.enums import Modality, ModelName
+from pointfusion.enums import Modality, FusionMethod
 
 class Trainer:
     """
@@ -17,22 +17,24 @@ class Trainer:
         epochs (int): Number of times to iterate dataset
         weight_decay (float): How much to decrease weight values
         batch_size (int): Number of data in single batch
-        modalities (list[pointfusion.Modality]): List of input modalities
+        modality (list[pointfusion.Modality]): List of input modalities
         loss_fcn (lambda): Loss function
     """
     def __init__(self,
-        point_count: int,
-        modality: Modality,
-        backbone: ModelName
+        num_points: Optional[int],
+        modality: Optional[Modality] = Modality.POINTCLOUD,
+        fusion_method: Optional[FusionMethod] = FusionMethod.DENSE,
+        lr: Optional[float] = 0.1,
+        epochs: Optional[int] = 20,
+        weight_decay: Optional[float] = 0.1,
+        batch_size: Optional[int] = 10
     ) -> None:
         self.init_loss = None
         # hyperparameters
-        self.lr = 0.1
-        self.epochs = 20
-        self.weight_decay = 0.1
-        self.batch_size = 10
-        self.modalities = []
-        self.loss_fcn = None
+        self.lr = lr
+        self.epochs = epochs
+        self.weight_decay = weight_decay
+        self.batch_size = batch_size
         self.weight_path = None
         self._test_set = None
         self._train_set = None
@@ -40,14 +42,14 @@ class Trainer:
         self._val_loader = None
         self._device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # Set the model and loss function
-        if backbone is ModelName.DenseFusion:
-            self.model = DenseFusion(point_count=point_count, modalities=modality)
+        if fusion_method is FusionMethod.DENSE:
+            self.model = DenseFusion(num_points=num_points, modality=modality)
             self.loss_fcn = dense_fusion
-        elif backbone is ModelName.GlobalFusion:
-            self.model = GlobalFusion(point_count=point_count, modalities=modality)
+        elif fusion_method is FusionMethod.GLOBAL:
+            self.model = GlobalFusion(num_points=num_points, modality=modality)
             self.loss_fcn = global_fusion
         # Set the dataset
-        self.dataset = LINEMOD(point_count=400, modalities=modality, model_name=backbone)
+        self.dataset = LINEMOD(num_points=400, modality=modality, fusion_method=fusion_method)
 
     def save_checkpoint(self, epoch: int) -> None:
         """
@@ -111,7 +113,7 @@ class Trainer:
                 loss = self.loss_fcn(output, corners)
                 if self.init_loss is None:
                     self.init_loss = loss.item()
-                print(f'EPOCH {epoch} / {self.epochs} | BATCH : {batch_idx} / {len(self._train_loader)} | LOSS : {loss}  | DELTA : {self.init_loss-loss.item()}')
+                #print(f'EPOCH {epoch} / {self.epochs} | BATCH : {batch_idx} / {len(self._train_loader)} | LOSS : {loss}  | DELTA : {self.init_loss-loss.item()}')
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -132,10 +134,10 @@ def main() -> None:
     """Run training loop"""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--model',
-        type=ModelName,
-        choices=list(ModelName),
-        default=ModelName.DenseFusion
+        '--fusion_method',
+        type=FusionMethod,
+        choices=list(FusionMethod),
+        default=FusionMethod.DENSE
     )
     parser.add_argument(
         '--modality',
@@ -144,24 +146,20 @@ def main() -> None:
         nargs='+',
         default=[Modality.POINTCLOUD]
     )
-    parser.add_argument('--batch_size', type=int, default=5)
     parser.add_argument('--lr', type=float, default=0.001)
+    parser.add_argument('--batch_size', type=int, default=5)
+    parser.add_argument('--num_points', type=int, default=400)
     parser.add_argument('--weight_decay', type=float, default=0.001)
     args = parser.parse_args()
     # Load model
-    #dataset = LINEMOD(point_count=400, modalities=args.modality, model_name=args.model)
-    trainer = Trainer(point_count=400, modality=args.modality, model_name=args.model)
-    trainer.batch_size = args.batch_size
-    trainer.lr = args.lr
-    trainer.weight_decay = args.weight_decay
-    # Set the model and loss fcn
-    if args.model is ModelName.DenseFusion:
-        trainer.model = DenseFusion(point_count=400, modalities=args.modality)
-        trainer.loss_fcn = dense_fusion
-    else:
-        trainer.model = GlobalFusion(point_count=400, modalities=args.modality)
-        trainer.loss_fcn = global_fusion
-    trainer.dataset = dataset
+    trainer = Trainer(
+        num_points=args.num_points,
+        modality=args.modality,
+        fusion_method=args.fusion_method,
+        batch_size=args.batch_size,
+        lr=args.lr,
+        weight_decay=args.weight_decay
+    )
     trainer.fit()
 
 if __name__ == '__main__':
