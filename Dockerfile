@@ -55,6 +55,7 @@ RUN mkdir -p /home/${USERNAME}/pointfusion
 WORKDIR /home/${USERNAME}/pointfusion
 
 RUN conda init bash
-RUN echo "conda activate pointfusion" >> ~/.bashrc
+RUN echo "conda activate pointfusion" >> ~/.bashrc && \
+    echo "pip install -e ." >> ~/.bashrc
 
 ENTRYPOINT [ "/bin/bash" ]

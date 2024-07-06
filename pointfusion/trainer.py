@@ -1,8 +1,9 @@
-import torch
-import open3d as o3d
-import numpy as np
-from typing import Optional
 import argparse
+from typing import Optional, Dict, List
+
+import torch
+import numpy as np
+import open3d as o3d
 
 from pointfusion.loss import dense_fusion, global_fusion
 from pointfusion.models import DenseFusion, GlobalFusion
@@ -12,6 +13,12 @@ from pointfusion.enums import Modality, FusionMethod
 class Trainer:
     """
     Trainer wrapper class
+    Args:
+        lr (Optional[float]): Learning rate
+        epochs (Optional[int]): Number of times to iterate dataset
+        weight_decay (Optional[float]): How much to decrease weight values
+        batch_size (Optional[int]): Number of data in single batch
+        modality (Optional[list[pointfusion.Modality]]): List of input modalities
     Attributes:
         lr (float): Learning rate
         epochs (int): Number of times to iterate dataset
@@ -51,37 +58,65 @@ class Trainer:
         # Set the dataset
         self.dataset = LINEMOD(num_points=400, modality=modality, fusion_method=fusion_method)
 
-    def save_checkpoint(self, epoch: int) -> None:
+    def print_training_results(self, stats: Dict[str, float]) -> None:
+        """Print current training statistics
+        Args:
+            stats (Dict[str, float]): Traning statistics
         """
-        Saves current status of model at given epoch
+        print(f'Epoch : {stats["epoch"]} / {self.epochs}')
+        print(f'Training Loss {stats["training_loss"]}')
+        print(f'Validation Loss {stats["validation_loss"]}')
+
+    def save_checkpoint(self, epoch: int) -> None:
+        """Saves current status of model at given epoch
+        Args:
+            epoch (int): Current epoch
         """
         torch.save(self._model.state_dict(), f'../weights/pointfusion_{epoch}.pt')
 
     @property
     def model(self) -> torch.nn.Module:
-        """
-        Gets pointfusion model
+        """Gets pointfusion model
+        Returns:
+            torch.nn.Module: Trained model
         """
         return self._model
-    
+
     @model.setter
-    def model(self, model):
+    def model(self, model: torch.nn.Module) -> None:
+        """Set the trainer model
+        Args:
+            model (torch.nn.Module): Model to set
+        """
         self._model = model.to(self._device)
         self._model.train()
 
     @property
     def dataset(self) -> torch.utils.data.Dataset:
-        """
-        Gets pointfusion dataset
+        """Gets pointfusion dataset
+        Returns:
+            torch.utils.data.Dataset: Current dataset
         """
         return self._dataset
 
     @dataset.setter
     def dataset(self, dataset: torch.utils.data.Dataset) -> None:
+        """Set the trainer dataset
+        Args:
+            dataset (torch.utils.data.Dataset)
+        """
         self._dataset = dataset
         self._train_set, self._test_set = dataset.split(0.8)
-        self._train_loader = torch.utils.data.DataLoader(dataset=self._train_set, batch_size=self.batch_size, shuffle=True)
-        self._val_loader = torch.utils.data.DataLoader(dataset=self._test_set, batch_size=self.batch_size, shuffle=True)
+        self._train_loader = torch.utils.data.DataLoader(
+            dataset=self._train_set,
+            batch_size=self.batch_size,
+            shuffle=True
+        )
+        self._val_loader = torch.utils.data.DataLoader(
+            dataset=self._test_set,
+            batch_size=self.batch_size,
+            shuffle=True
+        )
 
     def save(self, path: Optional[str] = None) -> None:
         """Save model to file
@@ -99,8 +134,9 @@ class Trainer:
         # loss and optimizer
         optimizer = torch.optim.Adam(self._model.parameters(), lr=self.lr)
         self.model.train()
-        stats = {'train_loss': [], 'validation_loss': [], 'epoch_loss': []}
+        stats = [{}] * self.epochs
         for epoch in range(self.epochs):
+            stats[epoch] = {'training_loss': [], 'validation_loss': [], 'epoch_loss': []}
             # Training
             running_loss = 0.0
             for batch_idx, (_, image, cloud, corners) in enumerate(self._train_loader):
@@ -113,22 +149,21 @@ class Trainer:
                 loss = self.loss_fcn(output, corners)
                 if self.init_loss is None:
                     self.init_loss = loss.item()
-                #print(f'EPOCH {epoch} / {self.epochs} | BATCH : {batch_idx} / {len(self._train_loader)} | LOSS : {loss}  | DELTA : {self.init_loss-loss.item()}')
+                # Print statistics
+                txt = f'{epoch}.{batch_idx} / {self.epochs}.{len(self._train_loader)} = {loss}'
+                print(txt)
+                # Zero gradients
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
                 running_loss += loss.item()
             with torch.no_grad():
-                for batch_idx, (id, image, cloud, corners) in enumerate(self._val_loader):
+                for batch_idx, (_, image, cloud, corners) in enumerate(self._val_loader):
                     cloud = cloud.to(self._device)
                     image = image.to(self._device)
                     corners = corners.to(self._device).float()
                     output = self._model(image, cloud)
                     loss = self.loss_fcn(output, corners)
-                    print(f'VALIDATION EPOCH {epoch} / {self.epochs} | BATCH : {batch_idx} / {len(self._train_loader)} | LOSS : {loss}')
-            stats['epoch_loss'].append(running_loss / len(self._train_loader))
-            stats['train_loss'].append(loss.item())
-            print(f'EPOCH LOSS " {stats["epoch_loss"][-1]}')
 
 def main() -> None:
     """Run training loop"""

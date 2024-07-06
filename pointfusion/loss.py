@@ -16,7 +16,7 @@ def global_fusion(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
 def dense_fusion(
         x: Tuple[torch.Tensor],
         y: torch.Tensor,
-        w: Optional[float] = 0.1,
+        w: Optional[float] = 0.5,
         eps: Optional[float] = 1e-16
     ) -> torch.Tensor:
     """Gets error between predicted corners and ground-truth corners
@@ -28,16 +28,11 @@ def dense_fusion(
     Returns:
         Loss
     """
-    import pdb; pdb.set_trace()
-    scores = x[0]
-    corners = x[1]
-    L1 = torch.nn.SmoothL1Loss(reduction='none')
-    loss = L1(corners, y).sum(dim=(1, 2))
-    #loss = (loss * scores) - (w * torch.log(scores + eps)) # as log approaches zero it grows negatively
+    score = x[0]
+    corner_offset = x[1]
+    fcn = torch.nn.SmoothL1Loss(reduction='none')
+    corner_loss = fcn(corner_offset, y).sum(dim=2).sum(dim=2)
+    # as log approaches zero it grows negatively
+    loss = (corner_loss * score) - (w * torch.log(score + eps))
     loss = loss.mean()
-    #import pdb; pdb.set_trace()
-    print(f'LOSS : {loss}')
-    #print(corners)
-    #print(y)
-    #print()
     return loss

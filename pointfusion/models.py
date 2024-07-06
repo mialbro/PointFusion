@@ -19,10 +19,12 @@ class ResNet(nn.Module):
         conv2 (nn.Conv1d): 1D convolution
         model (nn.Module): ResNet model
         features (nn.Sequential): ResNet with last layer removed
-    Args:
-        outupt_features (Optional[int]): Size of extracted features
     """
-    def __init__(self, output_features: Optional[int] = 2048):
+    def __init__(self, output_features: Optional[int] = 2048) -> None:
+        """ResNet wrapper constructor
+        Args:
+            output_features (Optional[int]): Number of features in the last layer
+        """
         super(ResNet, self).__init__()
         self.relu = nn.ReLU()
         self.conv1 = nn.Conv1d(2048, 3048, 1)
@@ -46,27 +48,23 @@ class ResNet(nn.Module):
         x = self.relu(x)
         return x
 
-    def channels(self) -> tuple:
+    def channels(self) -> Tuple[int, int, int]:
         """Extracts number of channels in the output data
         Returns:
-            Number of channels in output
+            Tuple[int, int, int]: Number of channels in output
         """
-        training = self.training
+        # Set to evaluation
         self.eval()
-        
+        # Extract the number of channels
         channels = None
         with torch.no_grad():
             device = None
-            #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             channels = self.forward(torch.randn((1, 3, 244, 244), device=device)).size()[1]
-      
-        if training:
+        # Set mode back to training
+        if self.training:
             self.train()
-
         return channels
 
-# ============================================================================
-# Point Net Backbone (main Architecture)
 class PointNetBackbone(nn.Module):
     """This is the main portion of Point Net before the classification and segmentation heads.
     The main function of this network is to obtain the local and global point features, 
@@ -90,67 +88,62 @@ class PointNetBackbone(nn.Module):
         num_points (Optional[int]): Number of inputted points
         num_global_features (Optional[int]): Number of extracted global features
     """
-    def __init__(self, num_points: Optional[int] = 500, num_global_feats: Optional[int] = 1024):
-        super(PointNetBackbone, self).__init__()
-
+    def __init__(
+            self,
+            num_points: Optional[int] = 500,
+            num_global_feats: Optional[int] = 1024
+        ) -> None:
+        #super(PointNetBackbone, self).__init__()
+        super().__init__()
         # if true concat local and global features
         self.num_points = num_points
         self.num_global_feats = num_global_feats
-
         # Spatial Transformer Networks (T-nets)
         self.tnet1 = Tnet(dim=3, num_points=num_points)
         self.tnet2 = Tnet(dim=64, num_points=num_points)
-
         # shared MLP 1
         self.conv1 = nn.Conv1d(3, 64, kernel_size=1)
         self.conv2 = nn.Conv1d(64, 64, kernel_size=1)
-
         # shared MLP 2
         self.conv3 = nn.Conv1d(64, 64, kernel_size=1)
         self.conv4 = nn.Conv1d(64, 128, kernel_size=1)
         self.conv5 = nn.Conv1d(128, self.num_global_feats, kernel_size=1)
-
         self.conv6 = nn.Conv1d(1088, 512, kernel_size=1)
         self.conv7 = nn.Conv1d(512, 256, kernel_size=1)
         self.conv8 = nn.Conv1d(256, 128, kernel_size=1)
-        
         # batch norms for both shared MLPs
         self.bn1 = nn.BatchNorm1d(64)
         self.bn2 = nn.BatchNorm1d(64)
         self.bn3 = nn.BatchNorm1d(64)
         self.bn4 = nn.BatchNorm1d(128)
         self.bn5 = nn.BatchNorm1d(self.num_global_feats)
-
         # max pool to get the global features
         self.max_pool = nn.MaxPool1d(kernel_size=num_points, return_indices=False)
-
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-
+        """PointNet forward pass
+        Args:
+            x (torch.Tensor): Input tensor
+        Returns:
+            torch.Tensor: Resulting tensor after forward pass
+        """
         # get batch size
         bs = x.shape[0]
-        
         # pass through first Tnet to get transform matrix
         A_input = self.tnet1(x)
-
         # perform first transformation across each point in the batch
         x = torch.bmm(x.transpose(2, 1), A_input).transpose(2, 1)
-
         # pass through first shared MLP
         #x = self.bn1(F.relu(self.conv1(x)))
         #x = self.bn2(F.relu(self.conv2(x)))
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
-        
         # get feature transform
         A_feat = self.tnet2(x)
-
         # perform second transformation across each (64 dim) feature in the batch
         x = torch.bmm(x.transpose(2, 1), A_feat).transpose(2, 1)
-
         # store local point features for segmentation head
         local_features = x.clone()
-
         # pass through second MLP
         #x = self.bn3(F.relu(self.conv3(x)))
         #x = self.bn4(F.relu(self.conv4(x)))
@@ -158,39 +151,56 @@ class PointNetBackbone(nn.Module):
         x = F.relu(self.conv3(x))
         x = F.relu(self.conv4(x))
         x = F.relu(self.conv5(x))
-
         global_feature = self.max_pool(x)
         global_feature = global_feature.view(bs, -1)
-
-        point_features = torch.cat((local_features, global_feature.unsqueeze(-1).repeat(1, 1, self.num_points)), dim=1)
+        point_features = torch.cat(
+            (
+                local_features,
+                global_feature.unsqueeze(-1).repeat(1, 1, self.num_points)
+            ),
+            dim=1
+        )
         point_features = F.relu(self.conv6(point_features))
         point_features = F.relu(self.conv7(point_features))
         point_features = F.relu(self.conv8(point_features))
-        
         return global_feature, point_features
-    
-    def channels(self) -> tuple:
+
+    def channels(self) -> Tuple[int, int, int]:
         """Extracts number of channels in the output data
         Returns:
-            Number of channels in output
+           Tuple[int, int, int]: Number of channels in output
         """
         training = self.training
         self.eval()
-
         channels = None
         with torch.no_grad():
             device = None
             #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             out = self.forward(torch.randn((1, 3, self.num_points), device=device))
             channels = [ x.size()[1] if len(x.size()) > 1 else x.size()[0] for x in out ]
-        
         if training:
             self.train()
-
         return channels
 
 class STN3d(nn.Module):
-    def __init__(self, channel):
+    """3D Spatial Network
+    Args:
+        channels (int): Number of data channels
+    Attributes:
+        self.conv1 = nn.Conv1d)
+        conv2 (nn.Conv1d)
+        conv3 (nn.Conv1d)
+        fc1 (nn.Linear)
+        fc2 (nn.Linear)
+        fc3 (nn.Linear)
+        relu (nn.ReLU)
+        bn1 (nn.BatchNorm1d)
+        bn2 (nn.BatchNorm1d)
+        bn3 (nn.BatchNorm1d)
+        bn4 (nn.BatchNorm1d)
+        bn5 (nn.BatchNorm1d)
+    """
+    def __init__(self, channel: int) -> None:
         super(STN3d, self).__init__()
         self.conv1 = torch.nn.Conv1d(channel, 64, 1)
         self.conv2 = torch.nn.Conv1d(64, 128, 1)
@@ -199,7 +209,6 @@ class STN3d(nn.Module):
         self.fc2 = nn.Linear(512, 256)
         self.fc3 = nn.Linear(256, 9)
         self.relu = nn.ReLU()
-
         self.bn1 = nn.BatchNorm1d(64)
         self.bn2 = nn.BatchNorm1d(128)
         self.bn3 = nn.BatchNorm1d(1024)
@@ -207,19 +216,24 @@ class STN3d(nn.Module):
         self.bn5 = nn.BatchNorm1d(256)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Spatial network forward pass
+        Args:
+            x (torch.Tensor): Input tensor
+        Returns:
+            torch.Tensor: Resulting tensor
+        """
         batchsize = x.size()[0]
         x = self.relu(self.conv1(x))
         x = self.relu(self.conv2(x))
         x = self.relu(self.conv3(x))
-
         x = torch.max(x, 2, keepdim=True)[0]
         x = x.view(-1, 1024)
-
         x = self.relu(self.fc1(x))
         x = self.relu(self.fc2(x))
         x = self.fc3(x)
-
-        iden = torch.from_numpy(np.eye(3).flatten().astype(np.float32)).view(1, 9).repeat(batchsize, 1)
+        iden = torch.from_numpy(
+            np.eye(3).flatten().astype(np.float32)
+        ).view(1, 9).repeat(batchsize, 1)
         if x.is_cuda:
             iden = iden.cuda()
         x = x + iden
@@ -227,6 +241,24 @@ class STN3d(nn.Module):
         return x
 
 class STNkd(nn.Module):
+    """Spatial network
+    Args:
+        k (Optional[int]) Number of input features
+    Attributes:
+        relu (torch.nn.ReLU)
+        conv1 (torch.nn.Conv1d)
+        conv2 (torch.nn.Conv1d)
+        conv3 (torch.nn.Conv1d)
+        fc1 (torch.nn.Linear)
+        fc2 (torch.nn.Linear)
+        fc3 (torch.nn.Linear)
+        bn1 (torch.nn.BatchNorm1d)
+        bn2 (torch.nn.BatchNorm1d)
+        bn3 (torch.nn.BatchNorm1d)
+        bn4 (torch.nn.BatchNorm1d)
+        bn5 (torch.nn.BatchNorm1d)
+        k (int)
+        """
     def __init__(self, k: Optional[int] = 64):
         super(STNkd, self).__init__()
         self.relu = nn.ReLU()
@@ -241,32 +273,35 @@ class STNkd(nn.Module):
         self.bn3 = nn.BatchNorm1d(1024)
         self.bn4 = nn.BatchNorm1d(512)
         self.bn5 = nn.BatchNorm1d(256)
-
         self.k = k
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Spatial network forward pass
+        Args:
+            x (torch.Tensor): Input tensor
+        Returns:
+            torch.Tensor: Resulting tensor
+        """
         batchsize = x.size()[0]
-
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = F.relu(self.conv3(x))
-
         x = torch.max(x, 2, keepdim=True)[0]
         x = x.view(-1, 1024)
-
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-
         x = self.fc3(x)
-
-        iden = Variable(torch.from_numpy(np.eye(self.k).flatten().astype(np.float32))).view(1, self.k * self.k).repeat(batchsize, 1)
+        iden = Variable(
+            torch.from_numpy(
+                np.eye(self.k).flatten().astype(np.float32)
+            )
+        ).view(1, self.k * self.k).repeat(batchsize, 1)
         if x.is_cuda:
             iden = iden.cuda()
         x = x + iden
         x = x.view(-1, self.k, self.k)
         return x
-    
-   
+
 class Tnet(nn.Module):
     """https://github.com/romaintha/pytorch_pointnet.git
     T-Net learns a Transformation matrix with a specified dimension 
@@ -288,26 +323,21 @@ class Tnet(nn.Module):
         bn5 (nn.BatchNorm1d):
         max_pool (nn.MaxPool1d): 
     """
-    def __init__(self, dim: int, num_points: Optional[int] = 2500):
+    def __init__(self, dim: int, num_points: Optional[int] = 2500) -> None:
         super(Tnet, self).__init__()
-
         # dimensions for transform matrix
         self.dim = dim 
-
         self.conv1 = nn.Conv1d(dim, 64, kernel_size=1)
         self.conv2 = nn.Conv1d(64, 128, kernel_size=1)
         self.conv3 = nn.Conv1d(128, 1024, kernel_size=1)
-
         self.linear1 = nn.Linear(1024, 512)
         self.linear2 = nn.Linear(512, 256)
         self.linear3 = nn.Linear(256, dim**2)
-
         self.bn1 = nn.BatchNorm1d(64)
         self.bn2 = nn.BatchNorm1d(128)
         self.bn3 = nn.BatchNorm1d(1024)
         self.bn4 = nn.BatchNorm1d(512)
         self.bn5 = nn.BatchNorm1d(256)
-
         self.max_pool = nn.MaxPool1d(kernel_size=num_points)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -315,63 +345,59 @@ class Tnet(nn.Module):
         Args:
             x (torch.Tensor): Input point embedding
         Returns:
-            Tensor
+            torch.Tensor: Processed tensor
         """
         bs = x.shape[0]
-
         # pass through shared MLP layers (conv1d)
         x = self.bn1(F.relu(self.conv1(x)))
         x = self.bn2(F.relu(self.conv2(x)))
         x = self.bn3(F.relu(self.conv3(x)))
-
         # max pool over num points
         x = self.max_pool(x).view(bs, -1)
-
         # pass through MLP
         x = self.bn4(F.relu(self.linear1(x)))
         x = self.bn5(F.relu(self.linear2(x)))
         x = self.linear3(x)
-
         # initialize identity matrix
         iden = torch.eye(self.dim, requires_grad=True).repeat(bs, 1, 1)
         if x.is_cuda:
             iden = iden.cuda()
-
         x = x.view(-1, self.dim, self.dim) + iden
-
         return x
-    
+
 class GlobalFusion(nn.Module):
-    """Global Fusion model which ingests images and/or point clouds and directly regresses the 8 corners of the 3D bounding box
+    """Global Fusion model which ingests images and/or point clouds 
+    and directly regresses the 8 corners of the 3D bounding box
     Args:
         num_points (Optional[int]): Number of points in point cloud
-        modalities (Optional[pointfusion.Modality]): Input data modalities
+        modality (Optional[pointfusion.Modality]): Input data modality
     Attributes:
-        modalities (Optional[pointfusion.Modality]): Input data modalities
+        modality (Optional[pointfusion.Modality]): Input data modality
         image_encoder (nn.Module): Network that extracts image features
         point_encoder (nn.Module): Network that extracts point cloud features
         model (torch.nn.Sequential): Global fusion model
-        """
-    def __init__(self, num_points: Optional[int] = 100, modalities: Optional[List[Modality]] = None):
+    """
+    def __init__(
+            self,
+            num_points: Optional[int] = 100,
+            modality: Modality = Modality.POINTCLOUD
+        ) -> None:
         super(GlobalFusion, self).__init__()
-        self.modalities = [Modality.RGB] if modalities is None else modalities
+        self.modality = modality
         self.image_encoder = ResNet(output_features=2048)
         self.point_encoder = PointNetBackbone(num_points=num_points)
         self.relu = torch.nn.ReLU()
-
         input_fusion_size = 0
-        if Modality.RGB in modalities:
+        if Modality.RGB in modality:
             input_fusion_size += self.image_encoder.channels()
-        if Modality.POINT_CLOUD in modalities:
+        if Modality.POINTCLOUD in modality:
             input_fusion_size += self.point_encoder.channels()[0]
-
         layers = []
         channels = np.linspace(input_fusion_size, 24, num=10, dtype=int)
         for i, channel in enumerate(channels):
             if (i + 1) < len(channels):
                 layers.append(self.relu)
                 layers.append(nn.Conv1d(channel, channels[i+1], 1))
-
         self.model = torch.nn.Sequential(*layers)
 
     def forward(
@@ -386,28 +412,27 @@ class GlobalFusion(nn.Module):
         Returns:
             8 corners of 3D bounding box
         """
-        B, D, N = point_cloud.size() if point_cloud is not None else image.size()
+        B, _, _ = point_cloud.size() if point_cloud is not None else image.size()
         features = None
         point_features = None
         image_features = None
         # Extract point-wise (n x 64) and global (1 x 1024) features from point cloud
-        if Modality.POINT_CLOUD in self.modalities:
+        if Modality.POINTCLOUD in self.modality:
             if point_cloud is None:
-                raise Exception("Must supply Point Cloud...")
+                raise ValueError("Must supply Point Cloud...")
             point_features, _ = self.point_encoder(point_cloud)
-        
         # Extract image features
-        if Modality.RGB in self.modalities:
+        if Modality.RGB in self.modality:
             if image is None:
-                raise Exception("Must supply image")
+                raise ValueError("Must supply image")
             image_features = self.image_encoder(image)
         # Fuse features
-        if len(self.modalities) == 2:
+        if len(self.modality) == 2:
             features = torch.concatenate([image_features, point_features], axis=1).unsqueeze(2)
-        elif Modality.RGB in self.modalities:
+        elif Modality.RGB in self.modality:
             features = image_features.unsqueeze(2)
-        elif Modality.POINT_CLOUD in self.modalities:
-            features = point_features.unsqueeze(2)  
+        elif Modality.POINTCLOUD in self.modality:
+            features = point_features.unsqueeze(2)
         features = self.model(features)
         features = features.view(B, 3, 8)
         return features
@@ -507,12 +532,12 @@ class DenseFusion(nn.Module):
         image_features = None
         # Only RGB
         if self.modality is Modality.RGB:
-            B, D, N = image.size()
+            B, _, _ = image.size()
             image_features = self.image_encoder(image)
             features = image_features.unsqueeze(2)
         else:
             # Extract point features
-            B, D, N = point_cloud.size()
+            B, _, _ = point_cloud.size()
             global_features, point_wise_features = self.point_encoder(point_cloud)
             global_features = global_features.unsqueeze(2).repeat(1, 1, 400)
             point_features = torch.concatenate((global_features, point_wise_features), axis=1)
@@ -541,10 +566,10 @@ class DenseFusion(nn.Module):
         scores = self.scoring_head(features.swapaxes(1, 2))
         corner_offsets = corner_offsets.view(B, -1, 3, 8)
         scores = scores.squeeze(2)
-        print((scores[0].min().item(), scores[1].max().item()))
+        #print(f'MIN SCORE: {scores[0].min().item()} MAX SCORE: {scores[0].max().item()}')
+        #print(f'SCORE DIFF : {scores[0].max().item() - scores[0].min().item()}')
         scores = self.soft_max(scores)
-        print((scores[0].min().item(), scores[1].max().item()))
-        print()
-
+        #print(f'MIN SCORE: {scores[0].min().item()} MAX SCORE: {scores[0].max().item()}')
+        #print()
         return scores, corner_offsets
     

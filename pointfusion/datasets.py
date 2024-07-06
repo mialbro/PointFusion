@@ -173,6 +173,7 @@ class LINEMOD(Dataset):
         if depth_cloud.shape[0] > self.num_points:
             sample = np.random.choice(depth_cloud.shape[0], self.num_points, replace=False)
         else:
+            import pdb; pdb.set_trace()
             sample = np.random.choice(depth_cloud.shape[0], self.num_points, replace=True)
         corner_offsets = corner_offsets[sample]
         # sample depth point cloud
