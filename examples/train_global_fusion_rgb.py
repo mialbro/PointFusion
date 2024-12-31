@@ -1,17 +1,18 @@
+from pointfusion.models import GlobalFusion
+from pointfusion.modalities import RGB
+from pointfusion.datasets import LINEMOD
+from pointfusion.loss import global_fusion
+from pointfusion.trainer import Trainer
+
 import sys
 import argparse
 
-sys.path.append('../')
-
-import pointfusion
-
 def main(args):
-    model_name = pointfusion.ModelName.GlobalFusion
-    modalities = [ pointfusion.Modality.RGB ]
-    model = pointfusion.GlobalFusion(modalities=modalities)
-    dataset = pointfusion.LINEMOD(model_name=model_name, modalities=modalities)
-    loss_fcn = pointfusion.loss.global_fusion
-    trainer = pointfusion.Trainer()
+    modalities = [ RGB ]
+    model = GlobalFusion(modalities=modalities)
+    dataset = LINEMOD(modalities=modalities)
+    loss_fcn = global_fusion
+    trainer = Trainer()
     trainer.batch_size = 5
     trainer.lr = 0.01
     trainer.model = model

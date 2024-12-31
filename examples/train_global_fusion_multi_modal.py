@@ -1,8 +1,6 @@
-import sys
-
-sys.path.append('../')
-
 import pointfusion
+
+import sys
 
 def main():
     model_name = pointfusion.ModelName.GlobalFusion

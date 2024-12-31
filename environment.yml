@@ -4,31 +4,32 @@ channels:
   - anaconda
   - open3d-admin
   - nvidia
+  - conda-forge
   - eyeware
 dependencies:
-  - python=3.8
+  - python=3.10  # Specify a compatible Python version
   - numpy
   - pillow
   - opencv
   - matplotlib
-  - pytorch=*=*cuda*
+  - pytorch::pytorch
   - pytorch::torchvision
   - pytorch::torchaudio
-  - pytorch-cuda=12.1
-  - conda-forge::librealsense
+  - pytorch-cuda=12.4
+  - conda-forge::librealsense  # Include librealsense directly from conda-forge
   - conda-forge::openmp
   - conda-forge::openblas
   - conda-forge::libudev
   - pip
   - pip:
-    - torchsummary
-    - scipy
-    - distinctipy
-    - scikit-learn
-    - pandas
-    - addict
-    - plyfile
-    - tqdm
-    - pyrealsense2
-    - pyyaml
-    - open3d
+      - torchsummary
+      - scipy
+      - distinctipy
+      - scikit-learn
+      - pandas
+      - addict
+      - plyfile
+      - tqdm
+      # Exclude pyrealsense2 for manual installation
+      - pyyaml
+      - open3d

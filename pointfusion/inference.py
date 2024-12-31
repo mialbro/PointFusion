@@ -9,6 +9,7 @@ import numpy as np
 import numpy.typing as npt
 
 from pointfusion.camera import Camera
+from pointfusion.d455 import D455
 from pointfusion.enums import FusionMethod
 from pointfusion.models import GlobalFusion, DenseFusion
 
@@ -92,11 +93,11 @@ def main() -> None:
     )
     args = parser.parse_args()
     # Load model
-    inference = Inference(args.weights, args.fusion_method)
+    model = Inference(args.weights, args.fusion_method)
     # Run camera
-    camera = Camera()
+    camera = D455()
     for image, depth, _ in camera:
-        corners = inference(image, depth)
+        import pdb; pdb.set_trace()
 
 if __name__ == '__main__':
     main()

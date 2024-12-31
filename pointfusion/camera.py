@@ -53,6 +53,20 @@ class Camera:
         self._frame_id = frame_id
         self._parent_id = parent_id
 
+    def __iter__(self) -> "Camera":
+        """Override iterator
+        Returns:
+            Camera
+        """
+        return self
+
+    def __next__(self) -> npt.NDArray[np.float64]:
+        """Return the next object
+        Returns:
+            npt.NDArray[np.float64]
+        """
+        return None
+
     @property
     def frame_id(self) -> str:
         """Get frame id from camera

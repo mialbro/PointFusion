@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -35,15 +35,25 @@ RUN apt update && \
         libgl1-mesa-glx \
         curl
 
-RUN curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh"
-RUN chmod +x Mambaforge-$(uname)-$(uname -m).sh
-RUN ./Mambaforge-$(uname)-$(uname -m).sh -b -p /opt/mamba
+RUN curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+RUN bash Miniforge3-$(uname)-$(uname -m).sh -b -p /opt/miniforge3
 
-ENV PATH /opt/mamba/bin:$PATH
+ENV PATH /opt/miniforge3/bin:$PATH
 COPY environment.yml .
-RUN conda update conda
-RUN conda install mamba -n base -c conda-forge
-RUN mamba env create -f environment.yml
+RUN conda update -n base -c conda-forge conda
+RUN conda env create -f environment.yml
+
+RUN apt-get install -y apt-transport-https lsb-release linux-headers-$(uname -r)
+
+RUN mkdir -p /etc/apt/keyrings && \
+    curl -sSf https://librealsense.intel.com/Debian/librealsense.pgp | tee /etc/apt/keyrings/librealsense.pgp > /dev/null && \
+    echo "deb [signed-by=/etc/apt/keyrings/librealsense.pgp] https://librealsense.intel.com/Debian/apt-repo `lsb_release -cs` main" | \
+    tee /etc/apt/sources.list.d/librealsense.list && \
+    apt-get update
+
+RUN apt-get install -y librealsense2-utils librealsense2-dev librealsense2-dbg
+RUN apt-get update && \
+    apt-get upgrade -y
 
 ARG USERNAME
 RUN useradd -m ${USERNAME}
