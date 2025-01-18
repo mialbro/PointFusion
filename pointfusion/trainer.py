@@ -8,7 +8,7 @@ import open3d as o3d
 from pointfusion.loss import dense_fusion, global_fusion
 from pointfusion.models import DenseFusion, GlobalFusion
 from pointfusion.datasets import LINEMOD
-from pointfusion.enums import Modality, FusionMethod
+from pointfusion.enums import FusionMethod
 
 class Trainer:
     """
@@ -28,9 +28,6 @@ class Trainer:
         loss_fcn (lambda): Loss function
     """
     def __init__(self,
-        num_points: Optional[int],
-        modality: Optional[Modality] = Modality.POINTCLOUD,
-        fusion_method: Optional[FusionMethod] = FusionMethod.DENSE,
         lr: Optional[float] = 0.1,
         epochs: Optional[int] = 20,
         weight_decay: Optional[float] = 0.1,
@@ -42,12 +39,14 @@ class Trainer:
         self.epochs = epochs
         self.weight_decay = weight_decay
         self.batch_size = batch_size
-        self.weight_path = None
+        self.path = None
+        self.loss_fcn = None
         self._test_set = None
         self._train_set = None
         self._train_loader = None
         self._val_loader = None
         self._device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        '''
         # Set the model and loss function
         if fusion_method is FusionMethod.DENSE:
             self.model = DenseFusion(num_points=num_points, modality=modality)
@@ -57,6 +56,7 @@ class Trainer:
             self.loss_fcn = global_fusion
         # Set the dataset
         self.dataset = LINEMOD(num_points=400, modality=modality, fusion_method=fusion_method)
+        '''
 
     def print_training_results(self, stats: Dict[str, float]) -> None:
         """Print current training statistics
@@ -118,6 +118,10 @@ class Trainer:
             shuffle=True
         )
 
+    @property
+    def modalities(self):
+        return self.dataset.modalities if self.dataset else self.model.modalities
+
     def save(self, path: Optional[str] = None) -> None:
         """Save model to file
         Args:
@@ -126,7 +130,7 @@ class Trainer:
             None
         """
         if path is None:
-            path = self.weight_path
+            path = self.path
         torch.save(self.model.state_dict(), path)
 
     def fit(self) -> None:
@@ -145,24 +149,32 @@ class Trainer:
                 image = image.to(self._device)
                 corners = corners.to(self._device).float()
                 # forward
-                output = self._model(image, cloud)
+                print(f'fit : {cloud.size()}')
+                output = self._model(image=image, point_cloud=cloud)
+                print('after')
+                # Collect loss
                 loss = self.loss_fcn(output, corners)
                 if self.init_loss is None:
                     self.init_loss = loss.item()
                 # Print statistics
-                txt = f'{epoch}.{batch_idx} / {self.epochs}.{len(self._train_loader)} = {loss}'
-                print(txt)
+                print(f'LOSS : {loss} EPOCH : {epoch} / {self.epochs} BATCH :  {batch_idx} / {len(self._train_loader)}')
                 # Zero gradients
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
                 running_loss += loss.item()
+            self.save()
             with torch.no_grad():
                 for batch_idx, (_, image, cloud, corners) in enumerate(self._val_loader):
                     cloud = cloud.to(self._device)
                     image = image.to(self._device)
                     corners = corners.to(self._device).float()
-                    output = self._model(image, cloud)
+                    if Modality.POINTCLOUD in self.modalities and Modality.RGB in self.modalities:
+                        output = self._model(image=image, point_cloud=cloud)
+                    if Modality.POINTCLOUD in self.modalities:
+                        output = self._model(point_cloud=cloud)
+                    if Modality.RGB in self.modalities:
+                        output = self._model(image=image)
                     loss = self.loss_fcn(output, corners)
 
 def main() -> None:

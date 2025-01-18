@@ -10,7 +10,7 @@ from torch.utils.data import Dataset
 from typing import Optional
 
 from pointfusion.camera import Camera
-from pointfusion.enums import FusionMethod, Modality
+from pointfusion.enums import FusionMethod
 from pointfusion.utils import bbox_from_mask, get_corners, get_corner_offsets
 
 def normalize(mean, distance, points):
@@ -76,9 +76,7 @@ class LINEMOD(Dataset):
             root_dir: Optional[str] = '../datasets/Linemod_preprocessed',
             num_points: Optional[int] = 400,
             fusion_method: Optional[FusionMethod] = FusionMethod.DENSE,
-            modality: Optional[Modality] = Modality.RGB
     ) -> None:
-        self.modality = modality
         self.fusion_method = fusion_method
         self.depths = []
         self.masks = []
@@ -199,7 +197,7 @@ class LINEMOD(Dataset):
         if self.fusion_method is FusionMethod.GLOBAL:
             image = self.image_transform(image_)
             points = self.cloud_transform(depth_cloud).to(torch.float).squeeze(0)
-            corners = self.corner_transform(corners)
+            corners = self.corner_transform(corners).squeeze(0)
             return id, image, points, corners
         elif self.fusion_method is FusionMethod.DENSE:
             image = self.image_transform(image_)

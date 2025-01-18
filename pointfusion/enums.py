@@ -8,14 +8,6 @@ class Mode(Enum):
     def __str__(self):
         return self.name
 
-class Modality(Enum):
-    RGB = 1
-    POINTCLOUD = 2
-    RGB_POINTCLOUD = 3
-
-    def __str__(self):
-        return self.name
-
 class FusionMethod(Enum):
     """Enumerator for fusion strategy"""
     GLOBAL = 1

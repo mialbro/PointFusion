@@ -79,13 +79,12 @@ class D455(Camera):
         # Filter depth image
         depth_image = np.asanyarray(depth_frame.get_data())
         depth_image[depth_image > 3.0 / self.depth_scale] = 0
-        color_image = np.asanyarray(color_frame.get_data())
+        color_image = np.asanyarray(color_frame.get_data())[...,::-1]
         # Backproject point cloud
-        points, colors = self.back_project(depth_image, color_image[...,::-1])
+        points, colors = self.back_project(depth_image, color_image)
         point_cloud = o3d.geometry.PointCloud()
         point_cloud.points = o3d.utility.Vector3dVector(points)
         point_cloud.colors = o3d.utility.Vector3dVector(colors / 255.0)
-        import pdb; pdb.set_trace()
         return color_image, depth_image, point_cloud
 
     @property

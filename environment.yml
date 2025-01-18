@@ -30,6 +30,7 @@ dependencies:
       - addict
       - plyfile
       - tqdm
+      - pyrealsense2
       # Exclude pyrealsense2 for manual installation
       - pyyaml
       - open3d

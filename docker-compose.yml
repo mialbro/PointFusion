@@ -10,6 +10,9 @@ services:
       - USERNAME=${USER}
       - DEBIAN_FRONTEND=noninteractive
       - NVIDIA_VISIBLE_DEVICES=all
+      - QT_QPA_PLATFORM=xcb  # Use the xcb plugin
+      - QT_X11_NO_MITSHM=1  # Avoid shared memory issues
+      - QT_DEBUG_PLUGINS=1
     volumes:
       - ./:/home/${USER}/pointfusion
       - ./datasets:/home/${USER}/pointfusion/datasets

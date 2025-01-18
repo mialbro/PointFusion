@@ -28,6 +28,7 @@ def dense_fusion(
     Returns:
         Loss
     """
+    import pdb; pdb.set_trace()
     score = x[0]
     corner_offset = x[1]
     fcn = torch.nn.SmoothL1Loss(reduction='none')
@@ -36,3 +37,15 @@ def dense_fusion(
     loss = (corner_loss * score) - (w * torch.log(score + eps))
     loss = loss.mean()
     return loss
+
+    def view_tensor():
+        pass
+        '''
+        img = objects[0].permute(1, 2, 0).cpu().numpy()
+        img = (img * 255).astype(np.uint8)
+        image_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        cv2.imshow("image", image_bgr)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            print("Exiting...")
+            sys.exit()
+        '''

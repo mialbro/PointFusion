@@ -51,7 +51,7 @@ RUN mkdir -p /etc/apt/keyrings && \
     tee /etc/apt/sources.list.d/librealsense.list && \
     apt-get update
 
-RUN apt-get install -y librealsense2-utils librealsense2-dev librealsense2-dbg
+RUN apt-get install -y librealsense2-utils librealsense2-dev librealsense2-dbg x11-apps mesa-utils qttools5-dev-tools usbutils
 RUN apt-get update && \
     apt-get upgrade -y
 
@@ -64,8 +64,12 @@ USER ${USERNAME}
 RUN mkdir -p /home/${USERNAME}/pointfusion
 WORKDIR /home/${USERNAME}/pointfusion
 
+ENV PATH="/opt/miniforge3/bin:$PATH"
+ENV PATH="/opt/miniforge3/envs/pointfusion/bin:${PATH}"
+
 RUN conda init bash
 RUN echo "conda activate pointfusion" >> ~/.bashrc && \
     echo "pip install -e ." >> ~/.bashrc
 
+ENV QT_QPA_PLATFORM=xcb
 ENTRYPOINT [ "/bin/bash" ]
